@@ -127,6 +127,7 @@ var nodeStartCmd = &cobra.Command{
 	},
 }
 
+// peer node start 程序执行入口
 func serve(args []string) error {
 	// currently the peer only works with the standard MSP
 	// because in certain scenarios the MSP has to make sure
@@ -293,6 +294,8 @@ func serve(args []string) error {
 	reg := library.InitRegistry(libConf)
 
 	authFilters := reg.Lookup(library.Auth).([]authHandler.Filter)
+
+	// 设置背书服务
 	endorserSupport := &endorser.SupportImpl{
 		SignerSupport:    signingIdentity,
 		Peer:             peer.Default,
