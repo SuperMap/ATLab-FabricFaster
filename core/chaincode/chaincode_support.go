@@ -135,13 +135,16 @@ func (cs *ChaincodeSupport) LaunchInit(ccci *ccprovider.ChaincodeContainerInfo) 
 // error. If the chaincode is already running, it simply returns.
 func (cs *ChaincodeSupport) Launch(chainID, chaincodeName, chaincodeVersion string, qe ledger.QueryExecutor) (*Handler, error) {
 	cname := chaincodeName + ":" + chaincodeVersion
+	// 检查该链码容器是否已经注册
 	if h := cs.HandlerRegistry.Handler(cname); h != nil {
 		return h, nil
 	}
 
+	// 获取链码容器信息
 	ccci, err := cs.Lifecycle.ChaincodeContainerInfo(chaincodeName, qe)
 	if err != nil {
 		// TODO: There has to be a better way to do this...
+		// 正在使用开发者模式或链码尚未部署
 		if cs.UserRunsCC {
 			chaincodeLogger.Error(
 				"You are attempting to perform an action other than Deploy on Chaincode that is not ready and you are in developer mode. Did you forget to Deploy your chaincode?",

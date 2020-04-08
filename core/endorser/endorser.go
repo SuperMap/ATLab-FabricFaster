@@ -178,6 +178,7 @@ func (e *Endorser) callChaincode(txParams *ccprovider.TransactionParams, version
 		}
 
 		// this should not be a system chaincode
+		// 不能部署或安装系统链码
 		if e.s.IsSysCC(cds.ChaincodeSpec.ChaincodeId.Name) {
 			return nil, nil, errors.Errorf("attempting to deploy a system chaincode %s/%s", cds.ChaincodeSpec.ChaincodeId.Name, txParams.ChannelID)
 		}
@@ -301,7 +302,6 @@ func (e *Endorser) SimulateProposal(txParams *ccprovider.TransactionParams, cid 
 		}
 	}
 	endorserLogger.Errorf("序号%d 背书模拟阶段 模拟结果处理耗时 %dμs", randNum, time.Since(timePostCallChaincode).Microseconds())
-
 
 	return cdLedger, res, pubSimResBytes, ccevent, nil
 }
@@ -435,9 +435,9 @@ func (e *Endorser) preProcess(signedProp *pb.SignedProposal) (*validateResult, e
 // ProcessProposal process the Proposal
 // 背书过程处理提案流程
 /* 分为三个部分：
-	1、preProcess()格式检查和权限验证
-	2、SimulateProposal()模拟交易执行获取读写集
-	3、endorseProposal()背书执行结果并返回背书响应
+1、preProcess()格式检查和权限验证
+2、SimulateProposal()模拟交易执行获取读写集
+3、endorseProposal()背书执行结果并返回背书响应
 */
 func (e *Endorser) ProcessProposal(ctx context.Context, signedProp *pb.SignedProposal) (*pb.ProposalResponse, error) {
 	randNum := rand.Intn(10000)
