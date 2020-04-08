@@ -368,6 +368,7 @@ func (l *kvLedger) CommitWithPvtData(pvtdataAndBlock *ledger.BlockAndPvtData, co
 	blockNo := pvtdataAndBlock.Block.Header.Number
 
 	startBlockProcessing := time.Now()
+	// 处理私有数据
 	if commitOpts.FetchPvtDataFromLedger {
 		// when we reach here, it means that the pvtdata store has the
 		// pvtdata associated with this block but the stateDB might not
@@ -401,6 +402,7 @@ func (l *kvLedger) CommitWithPvtData(pvtdataAndBlock *ledger.BlockAndPvtData, co
 	// and added to the block. In other words, only after joining a new channel
 	// or peer reset, the commitHash would be added to the block
 	if block.Header.Number == 1 || l.commitHash != nil {
+		// 计算commit hash并写入区块头
 		l.addBlockCommitHash(pvtdataAndBlock.Block, updateBatchBytes)
 	}
 
@@ -428,7 +430,7 @@ func (l *kvLedger) CommitWithPvtData(pvtdataAndBlock *ledger.BlockAndPvtData, co
 		}
 	}
 
-	logger.Infof("[%s] Committed block [%d] with %d transaction(s) in %dms (state_validation=%dms block_and_pvtdata_commit=%dms state_commit=%dms)"+
+	logger.Errorf("[%s] Committed block [%d] with %d transaction(s) in %dms (state_validation=%dms block_and_pvtdata_commit=%dms state_commit=%dms)"+
 		" commitHash=[%x]",
 		l.ledgerID, block.Header.Number, len(block.Data.Data),
 		time.Since(startBlockProcessing)/time.Millisecond,

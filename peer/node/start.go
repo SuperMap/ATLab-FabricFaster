@@ -293,6 +293,7 @@ func serve(args []string) error {
 	}
 	reg := library.InitRegistry(libConf)
 
+	// 背书时的各种验证都会追加到authFilters中
 	authFilters := reg.Lookup(library.Auth).([]authHandler.Filter)
 
 	// 设置背书服务
@@ -411,6 +412,7 @@ func serve(args []string) error {
 	logger.Infof("Started peer with ID=[%s], network ID=[%s], address=[%s]", peerEndpoint.Id, networkID, peerEndpoint.Address)
 
 	// check to see if the peer ledgers have been reset
+	// 检查该节点是否执行了peer node reste，如果reset则重新构建账本
 	preResetHeights, err := kvledger.LoadPreResetHeight()
 	if err != nil {
 		return fmt.Errorf("error loading prereset height: %s", err)
@@ -424,6 +426,7 @@ func serve(args []string) error {
 			reject: true,
 		}
 		authFilters = append(authFilters, resetFilter)
+		// 循环构建账本，直到获得完整账本
 		go resetLoop(resetFilter, preResetHeights, peer.GetLedger, 10*time.Second)
 	}
 
@@ -975,6 +978,7 @@ func resetLoop(
 	interval time.Duration,
 ) {
 	// periodically check to see if current ledger height(s) surpass prereset height(s)
+	// 定时器，定时检查账本是否构建完毕
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {

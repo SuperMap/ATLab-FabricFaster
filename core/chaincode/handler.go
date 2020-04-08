@@ -324,6 +324,7 @@ func (h *Handler) ChaincodeName() string {
 }
 
 // serialSend serializes msgs so gRPC will be happy
+// 串行通过gRPC向链码容器发送消息
 func (h *Handler) serialSend(msg *pb.ChaincodeMessage) error {
 	h.serialLock.Lock()
 	defer h.serialLock.Unlock()
@@ -342,6 +343,7 @@ func (h *Handler) serialSend(msg *pb.ChaincodeMessage) error {
 // can be nonblocking. Only errors need to be handled and these are handled by
 // communication on supplied error channel. A typical use will be a non-blocking or
 // nil channel
+// 串行发送，异步等待结果
 func (h *Handler) serialSendAsync(msg *pb.ChaincodeMessage) {
 	go func() {
 		if err := h.serialSend(msg); err != nil {
@@ -352,6 +354,7 @@ func (h *Handler) serialSendAsync(msg *pb.ChaincodeMessage) {
 				Txid:      msg.Txid,
 				ChannelId: msg.ChannelId,
 			}
+			// 写入通知信息
 			h.Notify(resp)
 
 			// surface send error to stream processing
@@ -541,6 +544,7 @@ func (h *Handler) HandleRegister(msg *pb.ChaincodeMessage) {
 	h.notifyRegistry(nil)
 }
 
+// 当链码执行完成后发出通知
 func (h *Handler) Notify(msg *pb.ChaincodeMessage) {
 	tctx := h.TXContexts.Get(msg.ChannelId, msg.Txid)
 	if tctx == nil {
@@ -548,6 +552,7 @@ func (h *Handler) Notify(msg *pb.ChaincodeMessage) {
 		return
 	}
 
+	// 将链码执行完成的消息写入响应提醒通道
 	chaincodeLogger.Debugf("[%s] notifying Txid:%s, channelID:%s", shorttxid(msg.Txid), msg.Txid, msg.ChannelId)
 	tctx.ResponseNotifier <- msg
 	tctx.CloseQueryIterators()
@@ -1241,6 +1246,7 @@ func (h *Handler) Execute(txParams *ccprovider.TransactionParams, cccid *ccprovi
 	chaincodeLogger.Debugf("Entry")
 	defer chaincodeLogger.Debugf("Exit")
 
+	startTime := time.Now()
 	txParams.CollectionStore = h.getCollectionStore(msg.ChannelId)
 	txParams.IsInitTransaction = (msg.Type == pb.ChaincodeMessage_INIT)
 
@@ -1254,20 +1260,29 @@ func (h *Handler) Execute(txParams *ccprovider.TransactionParams, cccid *ccprovi
 		return nil, err
 	}
 
+	chaincodeLogger.Errorf("链码执行 发送执行请求前准备耗时 %dμs", time.Since(startTime).Microseconds())
+
+	startTime = time.Now()
+	// 串行异步发送消息
 	h.serialSendAsync(msg)
 
+	// 等待链码执行
 	var ccresp *pb.ChaincodeMessage
 	select {
 	case ccresp = <-txctx.ResponseNotifier:
+		// 获取执行完成的信号
 		// response is sent to user or calling chaincode. ChaincodeMessage_ERROR
 		// are typically treated as error
 	case <-time.After(timeout):
+		// 链码执行超时
 		err = errors.New("timeout expired while executing transaction")
 		ccName := cccid.Name + ":" + cccid.Version
 		h.Metrics.ExecuteTimeouts.With("chaincode", ccName).Add(1)
 	case <-h.streamDone():
+		// 链码数据流终端
 		err = errors.New("chaincode stream terminated")
 	}
+	chaincodeLogger.Errorf("链码执行 发送执行请求耗时 %dμs", time.Since(startTime).Microseconds())
 
 	return ccresp, err
 }

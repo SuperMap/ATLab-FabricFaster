@@ -20,6 +20,7 @@ type Filter interface {
 
 // ChainFilters chains the given auth filters in the order provided.
 // the last filter always forwards to the endorser
+// 所有验证的过滤器，背书过滤器加在最后，其他的过滤器要保证各种权限、账本、状态等的正确
 func ChainFilters(endorser peer.EndorserServer, filters ...Filter) peer.EndorserServer {
 	if len(filters) == 0 {
 		return endorser
