@@ -12,6 +12,8 @@ import (
 	"github.com/hyperledger/fabric/protos/common"
 	"github.com/hyperledger/fabric/protos/utils"
 	"github.com/pkg/errors"
+	"math/rand"
+	"time"
 )
 
 var logger = flogging.MustGetLogger("committer")
@@ -84,17 +86,24 @@ func (lc *LedgerCommitter) preCommit(block *common.Block) error {
 }
 
 // CommitWithPvtData commits blocks atomically with private data
+// 提交区块和私有数据的核心方法
 func (lc *LedgerCommitter) CommitWithPvtData(blockAndPvtData *ledger.BlockAndPvtData, commitOpts *ledger.CommitOptions) error {
+	randNum := rand.Intn(10000)
+	startTime := time.Now()
 	// Do validation and whatever needed before
 	// committing new block
+	// 只验证了是否为配置区块
 	if err := lc.preCommit(blockAndPvtData.Block); err != nil {
 		return err
 	}
+	logger.Errorf("序号%d 记账阶段 preCommit() 验证时间 %dμs", randNum, time.Since(startTime).Microseconds())
 
+	commitWithPvtDataStart := time.Now()
 	// Committing new block
 	if err := lc.PeerLedgerSupport.CommitWithPvtData(blockAndPvtData, commitOpts); err != nil {
 		return err
 	}
+	logger.Errorf("序号%d 记账阶段 commitWithPvtData() 提交时间 %dms", randNum, time.Since(commitWithPvtDataStart).Milliseconds())
 
 	return nil
 }

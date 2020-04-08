@@ -9,6 +9,7 @@ package endorser
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"strconv"
 	"time"
 
@@ -163,6 +164,7 @@ func (e *Endorser) callChaincode(txParams *ccprovider.TransactionParams, version
 	//
 	// NOTE that if there's an error all simulation, including the chaincode
 	// table changes in lscc will be thrown away
+	// 安装或升级链码
 	if cid.Name == "lscc" && len(input.Args) >= 3 && (string(input.Args[0]) == "deploy" || string(input.Args[0]) == "upgrade") {
 		userCDS, err := putils.GetChaincodeDeploymentSpec(input.Args[2], e.PlatformRegistry)
 		if err != nil {
@@ -213,6 +215,9 @@ func (e *Endorser) SanitizeUserCDS(userCDS *pb.ChaincodeDeploymentSpec) (*pb.Cha
 func (e *Endorser) SimulateProposal(txParams *ccprovider.TransactionParams, cid *pb.ChaincodeID) (ccprovider.ChaincodeDefinition, *pb.Response, []byte, *pb.ChaincodeEvent, error) {
 	endorserLogger.Debugf("[%s][%s] Entry chaincode: %s", txParams.ChannelID, shorttxid(txParams.TxID), cid)
 	defer endorserLogger.Debugf("[%s][%s] Exit", txParams.ChannelID, shorttxid(txParams.TxID))
+
+	randNum := rand.Intn(10000)
+	startTime := time.Now()
 	// we do expect the payload to be a ChaincodeInvocationSpec
 	// if we are supporting other payloads in future, this be glaringly point
 	// as something that should change
@@ -239,6 +244,9 @@ func (e *Endorser) SimulateProposal(txParams *ccprovider.TransactionParams, cid 
 		version = util.GetSysCCVersion()
 	}
 
+	endorserLogger.Errorf("序号%d 背书模拟阶段 检查链码信息耗时 %dμs", randNum, time.Since(startTime).Microseconds())
+
+	timeStartCallChaincode := time.Now()
 	// ---3. execute the proposal and get simulation results
 	var simResult *ledger.TxSimulationResults
 	var pubSimResBytes []byte
@@ -249,7 +257,9 @@ func (e *Endorser) SimulateProposal(txParams *ccprovider.TransactionParams, cid 
 		endorserLogger.Errorf("[%s][%s] failed to invoke chaincode %s, error: %+v", txParams.ChannelID, shorttxid(txParams.TxID), cid, err)
 		return nil, nil, nil, nil, err
 	}
+	endorserLogger.Errorf("序号%d 背书模拟阶段 链码执行耗时 %dμs", randNum, time.Since(timeStartCallChaincode).Microseconds())
 
+	timePostCallChaincode := time.Now()
 	if txParams.TXSimulator != nil {
 		if simResult, err = txParams.TXSimulator.GetTxSimulationResults(); err != nil {
 			txParams.TXSimulator.Done()
@@ -290,6 +300,9 @@ func (e *Endorser) SimulateProposal(txParams *ccprovider.TransactionParams, cid 
 			return nil, nil, nil, nil, err
 		}
 	}
+	endorserLogger.Errorf("序号%d 背书模拟阶段 模拟结果处理耗时 %dμs", randNum, time.Since(timePostCallChaincode).Microseconds())
+
+
 	return cdLedger, res, pubSimResBytes, ccevent, nil
 }
 
@@ -420,7 +433,14 @@ func (e *Endorser) preProcess(signedProp *pb.SignedProposal) (*validateResult, e
 }
 
 // ProcessProposal process the Proposal
+// 背书过程处理提案流程
+/* 分为三个部分：
+	1、preProcess()格式检查和权限验证
+	2、SimulateProposal()模拟交易执行获取读写集
+	3、endorseProposal()背书执行结果并返回背书响应
+*/
 func (e *Endorser) ProcessProposal(ctx context.Context, signedProp *pb.SignedProposal) (*pb.ProposalResponse, error) {
+	randNum := rand.Intn(10000)
 	// start time for computing elapsed time metric for successfully endorsed proposals
 	startTime := time.Now()
 	e.Metrics.ProposalsReceived.Add(1)
@@ -457,6 +477,9 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProp *pb.SignedPro
 
 	prop, hdrExt, chainID, txid := vr.prop, vr.hdrExt, vr.chainID, vr.txid
 
+	endorserLogger.Errorf("序号%d 背书阶段 preProcess() 验证时间 %dμs", randNum, time.Since(startTime).Microseconds())
+
+	preProcessStart := time.Now()
 	// obtaining once the tx simulator for this proposal. This will be nil
 	// for chainless proposals
 	// Also obtain a history query executor for history queries, since tx simulator does not cover history
@@ -519,7 +542,9 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProp *pb.SignedPro
 			return pResp, nil
 		}
 	}
+	endorserLogger.Errorf("序号%d 背书阶段 simulateProposalStart() 模拟时间 %dμs", randNum, time.Since(preProcessStart).Microseconds())
 
+	simulateProposalStart := time.Now()
 	// 2 -- endorse and get a marshalled ProposalResponse message
 	var pResp *pb.ProposalResponse
 
@@ -551,6 +576,10 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProp *pb.SignedPro
 			return pResp, nil
 		}
 	}
+
+	endorserLogger.Errorf("序号%d 背书阶段 endorseProposal() 签名背书时间 %dμs", randNum, time.Since(simulateProposalStart).Microseconds())
+
+	endorserLogger.Errorf("序号%d 背书阶段总时间 %dμs", randNum, time.Since(startTime).Microseconds())
 
 	// Set the proposal response payload - it
 	// contains the "return value" from the
