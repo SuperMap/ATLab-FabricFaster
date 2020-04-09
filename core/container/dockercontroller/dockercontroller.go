@@ -16,7 +16,6 @@ import (
 	"fmt"
 	"io"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -177,7 +176,7 @@ func getDockerHostConfig() *docker.HostConfig {
 func (vm *DockerVM) createContainer(client dockerClient, imageID, containerID string, args, env []string, attachStdout bool) error {
 	logger := dockerLogger.With("imageID", imageID, "containerID", containerID)
 
-	for i := 0; i < runtime.NumCPU(); i++ {
+	for i := 0; i < util.GetNumOfCPU(); i++ {
 		logger.Debugw("create container" + strconv.Itoa(i))
 		var containerID_i string
 		if i > 0 {
@@ -258,7 +257,7 @@ func (vm *DockerVM) Start(ccid ccintf.CCID, args, env []string, filesToUpload ma
 	}
 
 	// 停止容器，kill或者remove 重名容器
-	for i := 0; i < runtime.NumCPU(); i++ {
+	for i := 0; i < util.GetNumOfCPU(); i++ {
 		logger.Debugw("create container" + strconv.Itoa(i))
 		var containerName_i string
 		if i > 0 {

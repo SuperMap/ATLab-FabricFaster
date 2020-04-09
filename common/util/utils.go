@@ -22,6 +22,7 @@ import (
 	"io"
 	"math/big"
 	"reflect"
+	"runtime"
 	"strings"
 	"time"
 
@@ -249,4 +250,13 @@ func flatten(k string, m *[]string, v reflect.Value) {
 	default:
 		*m = append(*m, fmt.Sprintf("%s = %v", k, v))
 	}
+}
+
+// 获取cpu核数
+func GetNumOfCPU() int {
+	numCPU := runtime.NumCPU()
+	if numCPU <= 1 {
+		return 1
+	}
+	return numCPU
 }

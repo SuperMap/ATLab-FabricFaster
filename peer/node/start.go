@@ -236,6 +236,7 @@ func serve(args []string) error {
 		throttle.StreamServerInterceptor,
 	)
 
+	// peerServer 是一个 gRPC 服务，peer中的所有其他服务都通过注册到该gRPC服务进行处理
 	peerServer, err := peer.NewPeerServer(listenAddr, serverConfig)
 	if err != nil {
 		logger.Fatalf("Failed to create peer server (%s)", err)
@@ -270,6 +271,7 @@ func serve(args []string) error {
 	pb.RegisterDeliverServer(peerServer.Server(), abServer)
 
 	// Initialize chaincode service
+	// 链码服务在背书服务中进行处理，背书服务注册在peer gRPC中，在执行完FilterChain中的所有AuthFilter后执行
 	chaincodeSupport, ccp, sccp, packageProvider := startChaincodeServer(peerHost, aclProvider, pr, opsSystem)
 
 	logger.Debugf("Running peer")
@@ -425,12 +427,15 @@ func serve(args []string) error {
 		resetFilter := &reset{
 			reject: true,
 		}
+
+		// 将reset过滤器加入到authFilters之后，确保权限验证通过之后，进行reset校验，如果之前peer被reset过，则需要同步区块
 		authFilters = append(authFilters, resetFilter)
 		// 循环构建账本，直到获得完整账本
 		go resetLoop(resetFilter, preResetHeights, peer.GetLedger, 10*time.Second)
 	}
 
 	// start the peer server
+	// 过滤器链，链中前边都是各种权限验证条件，最后是背书服务
 	auth := authHandler.ChainFilters(serverEndorser, authFilters...)
 	// Register the Endorser server
 	pb.RegisterEndorserServer(peerServer.Server(), auth)
