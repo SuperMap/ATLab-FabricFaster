@@ -272,6 +272,7 @@ func serve(args []string) error {
 
 	// Initialize chaincode service
 	// 链码服务在背书服务中进行处理，背书服务注册在peer gRPC中，在执行完FilterChain中的所有AuthFilter后执行
+	// 启动链码服务器，即gRPC服务，监听7002端口
 	chaincodeSupport, ccp, sccp, packageProvider := startChaincodeServer(peerHost, aclProvider, pr, opsSystem)
 
 	logger.Debugf("Running peer")
@@ -729,6 +730,7 @@ func registerChaincodeSupport(
 
 	ccSrv := pb.ChaincodeSupportServer(chaincodeSupport)
 	if tlsEnabled {
+		// 为 ccSrv 添加权限装饰
 		ccSrv = authenticator.Wrap(ccSrv)
 	}
 

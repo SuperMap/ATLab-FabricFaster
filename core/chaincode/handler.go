@@ -324,7 +324,6 @@ func (h *Handler) ChaincodeName() string {
 }
 
 // serialSend serializes msgs so gRPC will be happy
-// 串行通过gRPC向链码容器发送消息
 func (h *Handler) serialSend(msg *pb.ChaincodeMessage) error {
 	h.serialLock.Lock()
 	defer h.serialLock.Unlock()
@@ -1242,6 +1241,7 @@ func (h *Handler) HandleInvokeChaincode(msg *pb.ChaincodeMessage, txContext *Tra
 	return &pb.ChaincodeMessage{Type: pb.ChaincodeMessage_RESPONSE, Payload: res, Txid: msg.Txid, ChannelId: msg.ChannelId}, nil
 }
 
+// 链码执行
 func (h *Handler) Execute(txParams *ccprovider.TransactionParams, cccid *ccprovider.CCContext, msg *pb.ChaincodeMessage, timeout time.Duration) (*pb.ChaincodeMessage, error) {
 	chaincodeLogger.Debugf("Entry")
 	defer chaincodeLogger.Debugf("Exit")
@@ -1263,10 +1263,10 @@ func (h *Handler) Execute(txParams *ccprovider.TransactionParams, cccid *ccprovi
 	chaincodeLogger.Errorf("链码执行 发送执行请求前准备耗时 %dμs", time.Since(startTime).Microseconds())
 
 	startTime = time.Now()
-	// 串行异步发送消息
+	// 向链码容器发送消息
 	h.serialSendAsync(msg)
 
-	// 等待链码执行
+	// 等待链码容器返回结果
 	var ccresp *pb.ChaincodeMessage
 	select {
 	case ccresp = <-txctx.ResponseNotifier:

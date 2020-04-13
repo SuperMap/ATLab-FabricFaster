@@ -175,31 +175,22 @@ func getDockerHostConfig() *docker.HostConfig {
 
 func (vm *DockerVM) createContainer(client dockerClient, imageID, containerID string, args, env []string, attachStdout bool) error {
 	logger := dockerLogger.With("imageID", imageID, "containerID", containerID)
-
-	for i := 0; i < util.GetNumOfCPU(); i++ {
-		logger.Debugw("create container" + strconv.Itoa(i))
-		var containerID_i string
-		if i > 0 {
-			containerID_i = containerID + "-n" + strconv.Itoa(i)
-		} else {
-			containerID_i = containerID
-		}
-		_, err := client.CreateContainer(docker.CreateContainerOptions{
-			Name: containerID_i,
-			Config: &docker.Config{
-				Cmd:          args,
-				Image:        imageID,
-				Env:          env,
-				AttachStdout: attachStdout,
-				AttachStderr: attachStdout,
-			},
-			HostConfig: getDockerHostConfig(),
-		})
-		if err != nil {
-			return err
-		}
-		logger.Debugw("created container" + strconv.Itoa(i))
+	logger.Debugw("create container " + containerID)
+	_, err := client.CreateContainer(docker.CreateContainerOptions{
+		Name: containerID,
+		Config: &docker.Config{
+			Cmd:          args,
+			Image:        imageID,
+			Env:          env,
+			AttachStdout: attachStdout,
+			AttachStderr: attachStdout,
+		},
+		HostConfig: getDockerHostConfig(),
+	})
+	if err != nil {
+		return err
 	}
+	logger.Debugw("created container " + containerID)
 
 	return nil
 }
@@ -239,7 +230,6 @@ func (vm *DockerVM) deployImage(client dockerClient, ccid ccintf.CCID, reader io
 }
 
 // Start starts a container using a previously created docker image
-// 节点启动多个（默认CPU核数个）链码容器，以便并行执行链码
 func (vm *DockerVM) Start(ccid ccintf.CCID, args, env []string, filesToUpload map[string][]byte, builder container.Builder) error {
 	imageName, err := vm.GetVMNameForDocker(ccid)
 	if err != nil {
@@ -256,17 +246,7 @@ func (vm *DockerVM) Start(ccid ccintf.CCID, args, env []string, filesToUpload ma
 		return err
 	}
 
-	// 停止容器，kill或者remove 重名容器
-	for i := 0; i < util.GetNumOfCPU(); i++ {
-		logger.Debugw("create container" + strconv.Itoa(i))
-		var containerName_i string
-		if i > 0 {
-			containerName_i = containerName + "-n" + strconv.Itoa(i)
-		} else {
-			containerName_i = containerName
-		}
-		vm.stopInternal(client, containerName_i, 0, false, false)
-	}
+	vm.stopInternal(client, containerName, 0, false, false)
 
 	// 创建容器
 	err = vm.createContainer(client, imageName, containerName, args, env, attachStdout)
@@ -340,6 +320,7 @@ func (vm *DockerVM) Start(ccid ccintf.CCID, args, env []string, filesToUpload ma
 	}
 
 	dockerLogger.Debugf("Started container %s", containerName)
+
 	return nil
 }
 

@@ -99,6 +99,7 @@ func chaincodeInvokeOrQuery(cmd *cobra.Command, invoke bool, cf *ChaincodeCmdFac
 	// otherwise, tests can explicitly set their own txid
 	txID := ""
 
+	// 向背书节点发送交易提案并获取背书结果
 	proposalResp, err := ChaincodeInvokeOrQuery(
 		spec,
 		channelID,
@@ -114,6 +115,7 @@ func chaincodeInvokeOrQuery(cmd *cobra.Command, invoke bool, cf *ChaincodeCmdFac
 		return errors.Errorf("%s - proposal response: %v", err, proposalResp)
 	}
 
+	// 处理背书响应，invoke则继续向orderer发送排序请求，query则直接显示背书结果
 	if invoke {
 		logger.Debugf("ESCC invoke result: %v", proposalResp)
 		pRespPayload, err := putils.GetProposalResponsePayload(proposalResp.Payload)

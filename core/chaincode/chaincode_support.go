@@ -135,12 +135,12 @@ func (cs *ChaincodeSupport) LaunchInit(ccci *ccprovider.ChaincodeContainerInfo) 
 // error. If the chaincode is already running, it simply returns.
 func (cs *ChaincodeSupport) Launch(chainID, chaincodeName, chaincodeVersion string, qe ledger.QueryExecutor) (*Handler, error) {
 	cname := chaincodeName + ":" + chaincodeVersion
-	// 检查该链码容器是否已经注册
+	// 检查该链码容器是否已经注册，如果已注册则直接返回handler
 	if h := cs.HandlerRegistry.Handler(cname); h != nil {
 		return h, nil
 	}
 
-	// 获取链码容器信息
+	// 获取链码容器信息，链码名、版本、语言、路径、容器类型等
 	ccci, err := cs.Lifecycle.ChaincodeContainerInfo(chaincodeName, qe)
 	if err != nil {
 		// TODO: There has to be a better way to do this...
