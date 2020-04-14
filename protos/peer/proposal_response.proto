@@ -53,6 +53,10 @@ message ProposalResponse {
 	Endorsement endorsement = 6;
 }
 
+message ProposalResponses {
+	repeated ProposalResponse proposalResponse = 1;
+}
+
 // A response with a representation similar to an HTTP response that can
 // be used within another message.
 message Response {
