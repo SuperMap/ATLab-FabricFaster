@@ -184,14 +184,17 @@ func (h *Handler) handleMessage(msg *pb.ChaincodeMessage) error {
 
 	switch h.state {
 	case Created:
+		// 链码容器已经创建，接下来需要注册
 		return h.handleMessageCreatedState(msg)
 	case Ready:
+		// 链码容器已经准备好，可以处理链码调用的各种请求
 		return h.handleMessageReadyState(msg)
 	default:
 		return errors.Errorf("handle message: invalid state %s for transaction %s", h.state, msg.Txid)
 	}
 }
 
+// 处理链码已经创建完毕之后的消息
 func (h *Handler) handleMessageCreatedState(msg *pb.ChaincodeMessage) error {
 	switch msg.Type {
 	case pb.ChaincodeMessage_REGISTER:
@@ -202,6 +205,7 @@ func (h *Handler) handleMessageCreatedState(msg *pb.ChaincodeMessage) error {
 	return nil
 }
 
+// 处理链码容器已经准备好的消息
 func (h *Handler) handleMessageReadyState(msg *pb.ChaincodeMessage) error {
 	switch msg.Type {
 	case pb.ChaincodeMessage_COMPLETED, pb.ChaincodeMessage_ERROR:
@@ -401,6 +405,7 @@ func (h *Handler) streamDone() <-chan struct{} {
 	return h.streamDoneChan
 }
 
+// 处理gRPC的流，这里处理的是链码容器的信息
 func (h *Handler) ProcessStream(stream ccintf.ChaincodeStream) error {
 	defer h.deregister()
 

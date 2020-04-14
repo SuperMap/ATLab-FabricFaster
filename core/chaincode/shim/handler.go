@@ -235,6 +235,7 @@ func (handler *Handler) handleInit(msg *pb.ChaincodeMessage, errc chan error) {
 }
 
 // handleTransaction Handles request to execute a transaction.
+// 执行交易，即运行链码
 func (handler *Handler) handleTransaction(msg *pb.ChaincodeMessage, errc chan error) {
 	// The defer followed by triggering a go routine dance is needed to ensure that the previous state transition
 	// is completed before the next one is triggered. The previous state transition is deemed complete only when
@@ -270,6 +271,7 @@ func (handler *Handler) handleTransaction(msg *pb.ChaincodeMessage, errc chan er
 		if nextStateMsg = errFunc(err, stub.chaincodeEvent, "[%s] Transaction execution failed. Sending %s", shorttxid(msg.Txid), pb.ChaincodeMessage_ERROR.String()); nextStateMsg != nil {
 			return
 		}
+		//执行链码中的invoke接口
 		res := handler.cc.Invoke(stub)
 
 		// Endorser will handle error contained in Response.
@@ -798,6 +800,7 @@ func (handler *Handler) handleReady(msg *pb.ChaincodeMessage, errc chan error) e
 		return nil
 
 	case pb.ChaincodeMessage_TRANSACTION:
+		// 链码交易信息
 		chaincodeLogger.Debugf("[%s] Received %s, invoking transaction on chaincode(state:%s)", shorttxid(msg.Txid), msg.Type, handler.state)
 		// Call the chaincode's Run function to invoke transaction
 		handler.handleTransaction(msg, errc)
@@ -838,6 +841,7 @@ func (handler *Handler) handleMessage(msg *pb.ChaincodeMessage, errc chan error)
 
 	switch handler.state {
 	case ready:
+		// 处理交易
 		err = handler.handleReady(msg, errc)
 	case established:
 		err = handler.handleEstablished(msg, errc)

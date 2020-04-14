@@ -151,6 +151,7 @@ func Start(cc Chaincode) error {
 	//mock stream not set up ... get real stream
 	// 用户链码通信流获取函数
 	if streamGetter == nil {
+		// 当链码运行时才创建和ChaincodeServer通信的客户端k
 		streamGetter = userChaincodeStreamGetter
 	}
 
@@ -327,6 +328,7 @@ func newPeerClientConnection() (*grpc.ClientConn, error) {
 	return comm.NewClientConnectionWithAddress(peerAddress, true, false, nil, kaOpts)
 }
 
+// 链码容器中shim和Peer进行通信
 func chatWithPeer(chaincodename string, stream PeerChaincodeStream, cc Chaincode) error {
 	// Create the shim handler responsible for all control logic
 	handler := newChaincodeHandler(stream, cc)
@@ -358,6 +360,7 @@ func chatWithPeer(chaincodename string, stream PeerChaincodeStream, cc Chaincode
 		msgAvail <- &recvMsg{in, err}
 	}
 
+	// 链码容器中shim接收消息
 	go receiveMessage()
 	for {
 		// 等待流中接收到的消息并进行处理
@@ -377,7 +380,9 @@ func chatWithPeer(chaincodename string, stream PeerChaincodeStream, cc Chaincode
 				chaincodeLogger.Debugf("%+v", err)
 				return err
 			default:
+				// 接收到背书节点模拟交易时ChaincodeSupport发来的消息
 				chaincodeLogger.Debugf("[%s]Received message %s from peer", shorttxid(rmsg.msg.Txid), rmsg.msg.Type)
+				// 处理消息
 				err := handler.handleMessage(rmsg.msg, errc)
 				if err != nil {
 					err = errors.WithMessage(err, "error handling message")

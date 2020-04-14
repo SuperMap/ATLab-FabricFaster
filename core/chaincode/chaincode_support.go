@@ -133,9 +133,11 @@ func (cs *ChaincodeSupport) LaunchInit(ccci *ccprovider.ChaincodeContainerInfo) 
 // Launch starts executing chaincode if it is not already running. This method
 // blocks until the peer side handler gets into ready state or encounters a fatal
 // error. If the chaincode is already running, it simply returns.
+// 启动链码容器
 func (cs *ChaincodeSupport) Launch(chainID, chaincodeName, chaincodeVersion string, qe ledger.QueryExecutor) (*Handler, error) {
 	cname := chaincodeName + ":" + chaincodeVersion
 	// 检查该链码容器是否已经注册，如果已注册则直接返回handler
+	// handler中含有与该容器绑定的gRPC通信流
 	if h := cs.HandlerRegistry.Handler(cname); h != nil {
 		return h, nil
 	}
@@ -172,6 +174,7 @@ func (cs *ChaincodeSupport) Stop(ccci *ccprovider.ChaincodeContainerInfo) error 
 }
 
 // HandleChaincodeStream implements ccintf.HandleChaincodeStream for all vms to call with appropriate stream
+// 处理链码流
 func (cs *ChaincodeSupport) HandleChaincodeStream(stream ccintf.ChaincodeStream) error {
 	handler := &Handler{
 		Invoker:                    cs,
@@ -195,6 +198,7 @@ func (cs *ChaincodeSupport) HandleChaincodeStream(stream ccintf.ChaincodeStream)
 }
 
 // Register the bidi stream entry point called by chaincode to register with the Peer.
+// 将调用链码的双向流入口注册到Peer
 func (cs *ChaincodeSupport) Register(stream pb.ChaincodeSupport_RegisterServer) error {
 	return cs.HandleChaincodeStream(stream)
 }
@@ -238,6 +242,7 @@ func (cs *ChaincodeSupport) ExecuteLegacyInit(txParams *ccprovider.TransactionPa
 }
 
 // Execute invokes chaincode and returns the original response.
+// 执行调用链码并返回原始响应
 func (cs *ChaincodeSupport) Execute(txParams *ccprovider.TransactionParams, cccid *ccprovider.CCContext, input *pb.ChaincodeInput) (*pb.Response, *pb.ChaincodeEvent, error) {
 	resp, err := cs.Invoke(txParams, cccid, input)
 	return processChaincodeExecutionResult(txParams.TxID, cccid.Name, resp, err)
@@ -285,6 +290,7 @@ func (cs *ChaincodeSupport) InvokeInit(txParams *ccprovider.TransactionParams, c
 
 // Invoke will invoke chaincode and return the message containing the response.
 // The chaincode will be launched if it is not already running.
+// 调用链码
 func (cs *ChaincodeSupport) Invoke(txParams *ccprovider.TransactionParams, cccid *ccprovider.CCContext, input *pb.ChaincodeInput) (*pb.ChaincodeMessage, error) {
 	startTime := time.Now()
 	// 启动链码容器
@@ -307,6 +313,7 @@ func (cs *ChaincodeSupport) Invoke(txParams *ccprovider.TransactionParams, cccid
 	// otherwise, only allow cctype pb.ChaincodeMessage_INIT,
 	cctype := pb.ChaincodeMessage_TRANSACTION
 
+	// 执行链码
 	return cs.execute(cctype, txParams, cccid, input, h)
 }
 
