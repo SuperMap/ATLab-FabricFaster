@@ -124,7 +124,7 @@ const _ = grpc.SupportPackageIsVersion4
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type EndorserClient interface {
-	ProcessProposal(ctx context.Context, in *SignedProposals, opts ...grpc.CallOption) (*ProposalResponses, error)
+	ProcessProposal(ctx context.Context, in *SignedProposal, opts ...grpc.CallOption) (*ProposalResponse, error)
 }
 
 type endorserClient struct {
@@ -135,8 +135,8 @@ func NewEndorserClient(cc *grpc.ClientConn) EndorserClient {
 	return &endorserClient{cc}
 }
 
-func (c *endorserClient) ProcessProposal(ctx context.Context, in *SignedProposals, opts ...grpc.CallOption) (*ProposalResponses, error) {
-	out := new(ProposalResponses)
+func (c *endorserClient) ProcessProposal(ctx context.Context, in *SignedProposal, opts ...grpc.CallOption) (*ProposalResponse, error) {
+	out := new(ProposalResponse)
 	err := c.cc.Invoke(ctx, "/protos.Endorser/ProcessProposal", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -146,7 +146,7 @@ func (c *endorserClient) ProcessProposal(ctx context.Context, in *SignedProposal
 
 // EndorserServer is the server API for Endorser service.
 type EndorserServer interface {
-	ProcessProposal(context.Context, *SignedProposals) (*ProposalResponses, error)
+	ProcessProposal(context.Context, *SignedProposal) (*ProposalResponse, error)
 }
 
 func RegisterEndorserServer(s *grpc.Server, srv EndorserServer) {
@@ -154,7 +154,7 @@ func RegisterEndorserServer(s *grpc.Server, srv EndorserServer) {
 }
 
 func _Endorser_ProcessProposal_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SignedProposals)
+	in := new(SignedProposal)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -166,7 +166,7 @@ func _Endorser_ProcessProposal_Handler(srv interface{}, ctx context.Context, dec
 		FullMethod: "/protos.Endorser/ProcessProposal",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EndorserServer).ProcessProposal(ctx, req.(*SignedProposals))
+		return srv.(EndorserServer).ProcessProposal(ctx, req.(*SignedProposal))
 	}
 	return interceptor(ctx, in, info, handler)
 }

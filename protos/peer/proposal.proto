@@ -113,10 +113,6 @@ message SignedProposal {
 	bytes signature = 2;
 }
 
-message SignedProposals {
-	repeated SignedProposal signedProposal = 1;
-}
-
 // A Proposal is sent to an endorser for endorsement.  The proposal contains:
 // 1. A header which should be unmarshaled to a Header message.  Note that
 //    Header is both the header of a Proposal and of a Transaction, in that i)
