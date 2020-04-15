@@ -405,7 +405,7 @@ func (h *Handler) streamDone() <-chan struct{} {
 	return h.streamDoneChan
 }
 
-// 处理gRPC的流，这里处理的是链码容器的信息
+// 背书服务（Peer节点中）处理gRPC的流，这里处理的是链码容器的信息
 func (h *Handler) ProcessStream(stream ccintf.ChaincodeStream) error {
 	defer h.deregister()
 
