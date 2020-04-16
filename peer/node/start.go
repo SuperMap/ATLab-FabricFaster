@@ -237,15 +237,8 @@ func serve(args []string) error {
 	)
 
 	// peerServer 是 gRPC 服务，peer中的所有其他服务都通过注册到该gRPC服务进行处理
-	// TODO 启动两个PeerServer使用7051和8051
+	// TODO 启动PeerServer使用7051端口
 	peerServer, err := peer.NewPeerServer(listenAddr, serverConfig)
-	if err != nil {
-		logger.Fatalf("Failed to create peer server (%s)", err)
-	}
-
-	//　第二个PeerServer，占用端口8051
-	// TODO 端口号写入配置文件，或者根据配置文件中peer.listenAddress中的端口号加1000
-	peerServer2, err := peer.NewPeerServer("0.0.0.0:8051", serverConfig)
 	if err != nil {
 		logger.Fatalf("Failed to create peer server (%s)", err)
 	}
@@ -312,35 +305,29 @@ func serve(args []string) error {
 	authFilters := reg.Lookup(library.Auth).([]authHandler.Filter)
 
 	// 设置背书服务
-	var serverEndorsers []*endorser.Endorser
-
 	endorsementPluginsByName := reg.Lookup(library.Endorsement).(map[string]endorsement2.PluginFactory)
 	validationPluginsByName := reg.Lookup(library.Validation).(map[string]validation.PluginFactory)
 	pluginMapper := endorser.MapBasedPluginMapper(endorsementPluginsByName)
 
-	// 根据chaincodeSupports的个数创建serverEndorser
-	for _, chaincodeSupport := range chaincodeSupports {
-		endorserSupport := &endorser.SupportImpl{
-			SignerSupport:    signingIdentity,
-			Peer:             peer.Default,
-			PeerSupport:      peer.DefaultSupport,
-			ChaincodeSupport: chaincodeSupport,
-			SysCCProvider:    sccp,
-			ACLProvider:      aclProvider,
-		}
-
-		signingIdentityFetcher := (endorsement3.SigningIdentityFetcher)(endorserSupport)
-		channelStateRetriever := endorser.ChannelStateRetriever(endorserSupport)
-		pluginEndorser := endorser.NewPluginEndorser(&endorser.PluginSupport{
-			ChannelStateRetriever:   channelStateRetriever,
-			TransientStoreRetriever: peer.TransientStoreFactory,
-			PluginMapper:            pluginMapper,
-			SigningIdentityFetcher:  signingIdentityFetcher,
-		})
-		endorserSupport.PluginEndorser = pluginEndorser
-		serverEndorser := endorser.NewEndorserServer(privDataDist, endorserSupport, pr, metricsProvider)
-		serverEndorsers = append(serverEndorsers, serverEndorser)
+	endorserSupport := &endorser.SupportImpl{
+		SignerSupport:    signingIdentity,
+		Peer:             peer.Default,
+		PeerSupport:      peer.DefaultSupport,
+		ChaincodeSupport: chaincodeSupports,
+		SysCCProvider:    sccp,
+		ACLProvider:      aclProvider,
 	}
+
+	signingIdentityFetcher := (endorsement3.SigningIdentityFetcher)(endorserSupport)
+	channelStateRetriever := endorser.ChannelStateRetriever(endorserSupport)
+	pluginEndorser := endorser.NewPluginEndorser(&endorser.PluginSupport{
+		ChannelStateRetriever:   channelStateRetriever,
+		TransientStoreRetriever: peer.TransientStoreFactory,
+		PluginMapper:            pluginMapper,
+		SigningIdentityFetcher:  signingIdentityFetcher,
+	})
+	endorserSupport.PluginEndorser = pluginEndorser
+	serverEndorser := endorser.NewEndorserServer(privDataDist, endorserSupport, pr, metricsProvider)
 
 	expirationLogger := flogging.MustGetLogger("certmonitor")
 	crypto.TrackExpiration(
@@ -458,25 +445,15 @@ func serve(args []string) error {
 
 	// start the peer server
 	// 过滤器链，链中前边都是各种权限验证条件，最后是背书服务
-	auth := authHandler.ChainFilters(serverEndorsers[0], authFilters...)
-	auth2 := authHandler.ChainFilters(serverEndorsers[1], authFilters...)
+	auth := authHandler.ChainFilters(serverEndorser, authFilters...)
 	// Register the Endorser server
-
 	// 注册peerServer
 	pb.RegisterEndorserServer(peerServer.Server(), auth)
-	pb.RegisterEndorserServer(peerServer2.Server(), auth2)
 
 	// 启动peerServer
 	go func() {
 		var grpcErr error
 		if grpcErr = peerServer.Start(); grpcErr != nil {
-			grpcErr = fmt.Errorf("grpc server exited with error: %s", grpcErr)
-		}
-		serve <- grpcErr
-	}()
-	go func() {
-		var grpcErr error
-		if grpcErr = peerServer2.Start(); grpcErr != nil {
 			grpcErr = fmt.Errorf("grpc server exited with error: %s", grpcErr)
 		}
 		serve <- grpcErr

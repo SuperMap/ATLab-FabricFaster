@@ -33,7 +33,7 @@ type SupportImpl struct {
 	crypto.SignerSupport
 	Peer             peer.Operations
 	PeerSupport      peer.Support
-	ChaincodeSupport *chaincode.ChaincodeSupport
+	ChaincodeSupport []*chaincode.ChaincodeSupport
 	SysCCProvider    *scc.Provider
 	ACLProvider      aclmgmt.ACLProvider
 }

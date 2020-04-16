@@ -206,6 +206,7 @@ func (h *Handler) handleMessageCreatedState(msg *pb.ChaincodeMessage) error {
 }
 
 // 处理链码容器已经准备好的消息
+// 处理链码容器发来的请求
 func (h *Handler) handleMessageReadyState(msg *pb.ChaincodeMessage) error {
 	switch msg.Type {
 	case pb.ChaincodeMessage_COMPLETED, pb.ChaincodeMessage_ERROR:
