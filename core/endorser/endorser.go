@@ -440,7 +440,8 @@ func (e *Endorser) preProcess(signedProp *pb.SignedProposal) (*validateResult, e
 2、SimulateProposal()模拟交易执行获取读写集
 3、endorseProposal()背书执行结果并返回背书响应
 */
-func (e *Endorser) ProcessProposal(ctx context.Context, signedProp *pb.SignedProposal) (*pb.ProposalResponse, error) {
+func (e *Endorser) ProcessProposal(ctx context.Context, signedProps *pb.SignedProposals) (*pb.ProposalResponses, error) {
+	signedProp := signedProps.SignedProposal[0]
 	randNum := rand.Intn(10000)
 	// start time for computing elapsed time metric for successfully endorsed proposals
 	startTime := time.Now()
@@ -472,8 +473,9 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProp *pb.SignedPro
 	// 0 -- check and validate
 	vr, err := e.preProcess(signedProp)
 	if err != nil {
-		resp := vr.resp
-		return resp, err
+		//resp := vr.resp
+		//return resp, err
+		return nil, err
 	}
 
 	prop, hdrExt, chainID, txid := vr.prop, vr.hdrExt, vr.chainID, vr.txid
@@ -488,7 +490,8 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProp *pb.SignedPro
 	var historyQueryExecutor ledger.HistoryQueryExecutor
 	if acquireTxSimulator(chainID, vr.hdrExt.ChaincodeId) {
 		if txsim, err = e.s.GetTxSimulator(chainID, txid); err != nil {
-			return &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}, nil
+			return nil, nil
+			//return &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}, nil
 		}
 
 		// txsim acquires a shared lock on the stateDB. As this would impact the block commits (i.e., commit
@@ -501,7 +504,8 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProp *pb.SignedPro
 		defer txsim.Done()
 
 		if historyQueryExecutor, err = e.s.GetHistoryQueryExecutor(chainID); err != nil {
-			return &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}, nil
+			return nil, nil
+			//return &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}, nil
 		}
 	}
 
@@ -523,26 +527,31 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProp *pb.SignedPro
 	// 1 -- simulate
 	cd, res, simulationResult, ccevent, err := e.SimulateProposal(txParams, hdrExt.ChaincodeId)
 	if err != nil {
-		return &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}, nil
+		return nil, nil
+		//return &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}, nil
 	}
-	if res != nil {
-		if res.Status >= shim.ERROR {
-			endorserLogger.Errorf("[%s][%s] simulateProposal() resulted in chaincode %s response status %d for txid: %s", chainID, shorttxid(txid), hdrExt.ChaincodeId, res.Status, txid)
-			var cceventBytes []byte
-			if ccevent != nil {
-				cceventBytes, err = putils.GetBytesChaincodeEvent(ccevent)
-				if err != nil {
-					return nil, errors.Wrap(err, "failed to marshal event bytes")
-				}
-			}
-			pResp, err := putils.CreateProposalResponseFailure(prop.Header, prop.Payload, res, simulationResult, cceventBytes, hdrExt.ChaincodeId, hdrExt.PayloadVisibility)
-			if err != nil {
-				return &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}, nil
-			}
-
-			return pResp, nil
-		}
-	}
+	//if res != nil {
+	//	if res.Status >= shim.ERROR {
+	//		endorserLogger.Errorf("[%s][%s] simulateProposal() resulted in chaincode %s response status %d for txid: %s", chainID, shorttxid(txid), hdrExt.ChaincodeId, res.Status, txid)
+	//		var cceventBytes []byte
+	//		if ccevent != nil {
+	//			cceventBytes, err = putils.GetBytesChaincodeEvent(ccevent)
+	//			if err != nil {
+	//				return nil, errors.Wrap(err, "failed to marshal event bytes")
+	//			}
+	//		}
+	//		pResp, err := putils.CreateProposalResponseFailure(prop.Header, prop.Payload, res, simulationResult, cceventBytes, hdrExt.ChaincodeId, hdrExt.PayloadVisibility)
+	//		if err != nil {
+	//			//return &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}, nil
+	//			return nil, nil
+	//
+	//		}
+	//
+	//		//return pResp, nil
+	//		return nil, nil
+	//
+	//	}
+	//}
 	endorserLogger.Errorf("序号%d 背书阶段 simulateProposalStart() 模拟时间 %dμs", randNum, time.Since(preProcessStart).Microseconds())
 
 	simulateProposalStart := time.Now()
@@ -566,7 +575,8 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProp *pb.SignedPro
 		if err != nil {
 			meterLabels = append(meterLabels, "chaincodeerror", strconv.FormatBool(false))
 			e.Metrics.EndorsementsFailed.With(meterLabels...).Add(1)
-			return &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}, nil
+			//return &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}, nil
+			return nil, nil
 		}
 		if pResp.Response.Status >= shim.ERRORTHRESHOLD {
 			// the default ESCC treats all status codes about threshold as errors and fails endorsement
@@ -574,7 +584,8 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProp *pb.SignedPro
 			meterLabels = append(meterLabels, "chaincodeerror", strconv.FormatBool(true))
 			e.Metrics.EndorsementsFailed.With(meterLabels...).Add(1)
 			endorserLogger.Debugf("[%s][%s] endorseProposal() resulted in chaincode %s error for txid: %s", chainID, shorttxid(txid), hdrExt.ChaincodeId, txid)
-			return pResp, nil
+			return &pb.ProposalResponses{ProposalResponse: []*pb.ProposalResponse{pResp}}, nil
+			//return pResp, nil
 		}
 	}
 
@@ -591,7 +602,8 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProp *pb.SignedPro
 	e.Metrics.SuccessfulProposals.Add(1)
 	success = true
 
-	return pResp, nil
+	return &pb.ProposalResponses{ProposalResponse: []*pb.ProposalResponse{pResp}}, nil
+	//return pResp, nil
 }
 
 // determine whether or not a transaction simulator should be

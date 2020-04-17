@@ -68,17 +68,20 @@ func (cc *endorserClient) getChannels() ([]*pb.ChannelInfo, error) {
 		return nil, errors.New(fmt.Sprintf("Cannot create proposal, due to %s", err))
 	}
 
-	var signedProp *pb.SignedProposal
-	signedProp, err = utils.GetSignedProposal(prop, cc.cf.Signer)
+	var signedProp0 *pb.SignedProposal
+	signedProp0, err = utils.GetSignedProposal(prop, cc.cf.Signer)
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("Cannot create signed proposal, due to %s", err))
 	}
 
-	proposalResp, err := cc.cf.EndorserClient.ProcessProposal(context.Background(), signedProp)
+	signedProp := &pb.SignedProposals{SignedProposal: []*pb.SignedProposal{signedProp0}}
+
+	proposalResps, err := cc.cf.EndorserClient.ProcessProposal(context.Background(), signedProp)
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("Failed sending proposal, got %s", err))
 	}
 
+	proposalResp := proposalResps.ProposalResponse[0]
 	if proposalResp.Response == nil || proposalResp.Response.Status != 200 {
 		return nil, errors.New(fmt.Sprintf("Received bad response, status %d: %s", proposalResp.Response.Status, proposalResp.Response.Message))
 	}

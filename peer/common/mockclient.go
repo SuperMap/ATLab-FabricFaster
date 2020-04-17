@@ -27,7 +27,7 @@ import (
 )
 
 // GetMockEndorserClient return a endorser client return specified ProposalResponse and err(nil or error)
-func GetMockEndorserClient(response *pb.ProposalResponse, err error) pb.EndorserClient {
+func GetMockEndorserClient(response *pb.ProposalResponses, err error) pb.EndorserClient {
 	return &mockEndorserClient{
 		response: response,
 		err:      err,
@@ -35,11 +35,11 @@ func GetMockEndorserClient(response *pb.ProposalResponse, err error) pb.Endorser
 }
 
 type mockEndorserClient struct {
-	response *pb.ProposalResponse
+	response *pb.ProposalResponses
 	err      error
 }
 
-func (m *mockEndorserClient) ProcessProposal(ctx context.Context, in *pb.SignedProposal, opts ...grpc.CallOption) (*pb.ProposalResponse, error) {
+func (m *mockEndorserClient) ProcessProposal(ctx context.Context, in *pb.SignedProposals, opts ...grpc.CallOption) (*pb.ProposalResponses, error) {
 	return m.response, m.err
 }
 

@@ -53,7 +53,7 @@ import (
 	"github.com/hyperledger/fabric/core/container/dockercontroller"
 	"github.com/hyperledger/fabric/core/container/inproccontroller"
 	"github.com/hyperledger/fabric/core/endorser"
-	authHandler "github.com/hyperledger/fabric/core/handlers/auth"
+	//authHandler "github.com/hyperledger/fabric/core/handlers/auth"
 	endorsement2 "github.com/hyperledger/fabric/core/handlers/endorsement/api"
 	endorsement3 "github.com/hyperledger/fabric/core/handlers/endorsement/api/identities"
 	"github.com/hyperledger/fabric/core/handlers/library"
@@ -302,7 +302,7 @@ func serve(args []string) error {
 	reg := library.InitRegistry(libConf)
 
 	// 背书时的各种验证都会追加到authFilters中
-	authFilters := reg.Lookup(library.Auth).([]authHandler.Filter)
+	//authFilters := reg.Lookup(library.Auth).([]authHandler.Filter)
 
 	// 设置背书服务
 	endorsementPluginsByName := reg.Lookup(library.Endorsement).(map[string]endorsement2.PluginFactory)
@@ -423,32 +423,32 @@ func serve(args []string) error {
 
 	// check to see if the peer ledgers have been reset
 	// 检查该节点是否执行了peer node reste，如果reset则重新构建账本
-	preResetHeights, err := kvledger.LoadPreResetHeight()
-	if err != nil {
-		return fmt.Errorf("error loading prereset height: %s", err)
-	}
-	for cid, height := range preResetHeights {
-		logger.Infof("Ledger rebuild: channel [%s]: preresetHeight: [%d]", cid, height)
-	}
-	if len(preResetHeights) > 0 {
-		logger.Info("Ledger rebuild: Entering loop to check if current ledger heights surpass prereset ledger heights. Endorsement request processing will be disabled.")
-		resetFilter := &reset{
-			reject: true,
-		}
-
-		// 将reset过滤器加入到authFilters之后，确保权限验证通过之后，进行reset校验，如果之前peer被reset过，则需要同步区块
-		authFilters = append(authFilters, resetFilter)
-		//authFilters2 = append(authFilters2, resetFilter)
-		// 循环构建账本，直到获得完整账本
-		go resetLoop(resetFilter, preResetHeights, peer.GetLedger, 10*time.Second)
-	}
+	//preResetHeights, err := kvledger.LoadPreResetHeight()
+	//if err != nil {
+	//	return fmt.Errorf("error loading prereset height: %s", err)
+	//}
+	//for cid, height := range preResetHeights {
+	//	logger.Infof("Ledger rebuild: channel [%s]: preresetHeight: [%d]", cid, height)
+	//}
+	//if len(preResetHeights) > 0 {
+	//	logger.Info("Ledger rebuild: Entering loop to check if current ledger heights surpass prereset ledger heights. Endorsement request processing will be disabled.")
+	//	resetFilter := &reset{
+	//		reject: true,
+	//	}
+	//
+	//	// 将reset过滤器加入到authFilters之后，确保权限验证通过之后，进行reset校验，如果之前peer被reset过，则需要同步区块
+	//	authFilters = append(authFilters, resetFilter)
+	//	//authFilters2 = append(authFilters2, resetFilter)
+	//	// 循环构建账本，直到获得完整账本
+	//	go resetLoop(resetFilter, preResetHeights, peer.GetLedger, 10*time.Second)
+	//}
 
 	// start the peer server
 	// 过滤器链，链中前边都是各种权限验证条件，最后是背书服务
-	auth := authHandler.ChainFilters(serverEndorser, authFilters...)
+	//auth := authHandler.ChainFilters(serverEndorser, authFilters...)
 	// Register the Endorser server
 	// 注册peerServer
-	pb.RegisterEndorserServer(peerServer.Server(), auth)
+	pb.RegisterEndorserServer(peerServer.Server(), serverEndorser)
 
 	// 启动peerServer
 	go func() {
@@ -1086,7 +1086,7 @@ func (r *reset) Init(next pb.EndorserServer) {
 }
 
 // ProcessProposal processes a signed proposal
-func (r *reset) ProcessProposal(ctx context.Context, signedProp *pb.SignedProposal) (*pb.ProposalResponse, error) {
+func (r *reset) ProcessProposal(ctx context.Context, signedProp *pb.SignedProposals) (*pb.ProposalResponses, error) {
 	r.RLock()
 	defer r.RUnlock()
 	if r.reject {

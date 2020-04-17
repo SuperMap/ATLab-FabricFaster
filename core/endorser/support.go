@@ -127,8 +127,8 @@ func (s *SupportImpl) ExecuteLegacyInit(txParams *ccprovider.TransactionParams, 
 		Name:    name,
 		Version: version,
 	}
-
-	return s.ChaincodeSupport.ExecuteLegacyInit(txParams, cccid, cds)
+	support := s.ChaincodeSupport[0]
+	return support.ExecuteLegacyInit(txParams, cccid, cds)
 }
 
 // Execute a proposal and return the chaincode response
@@ -146,12 +146,15 @@ func (s *SupportImpl) Execute(txParams *ccprovider.TransactionParams, cid, name,
 	input = decoration.Apply(prop, input, decorators...)
 	txParams.ProposalDecorations = input.Decorations
 
-	return s.ChaincodeSupport.Execute(txParams, cccid, input)
+	support := s.ChaincodeSupport[0]
+
+	return support.Execute(txParams, cccid, input)
 }
 
 // GetChaincodeDefinition returns ccprovider.ChaincodeDefinition for the chaincode with the supplied name
 func (s *SupportImpl) GetChaincodeDefinition(chaincodeName string, txsim ledger.QueryExecutor) (ccprovider.ChaincodeDefinition, error) {
-	return s.ChaincodeSupport.Lifecycle.ChaincodeDefinition(chaincodeName, txsim)
+	support := s.ChaincodeSupport[0]
+	return support.Lifecycle.ChaincodeDefinition(chaincodeName, txsim)
 }
 
 // CheckACL checks the ACL for the resource for the Channel using the

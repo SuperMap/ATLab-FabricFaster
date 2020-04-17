@@ -28,6 +28,7 @@ func (f *filter) Init(next peer.EndorserServer) {
 }
 
 // ProcessProposal processes a signed proposal
-func (f *filter) ProcessProposal(ctx context.Context, signedProp *peer.SignedProposal) (*peer.ProposalResponse, error) {
-	return f.next.ProcessProposal(ctx, signedProp)
+func (f *filter) ProcessProposal(ctx context.Context, signedProp *peer.SignedProposals) (*peer.ProposalResponses, error) {
+	return nil, nil
+	//return f.next.ProcessProposal(ctx, signedProp)
 }

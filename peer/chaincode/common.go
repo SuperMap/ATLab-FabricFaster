@@ -462,17 +462,19 @@ func ChaincodeInvokeOrQuery(
 		return nil, errors.WithMessage(err, fmt.Sprintf("error creating proposal for %s", funcName))
 	}
 
-	signedProp, err := putils.GetSignedProposal(prop, signer)
+	signedProp0, err := putils.GetSignedProposal(prop, signer)
 	if err != nil {
 		return nil, errors.WithMessage(err, fmt.Sprintf("error creating signed proposal for %s", funcName))
 	}
+	signedProp := &pb.SignedProposals{SignedProposal: []*pb.SignedProposal{signedProp0}}
+
 	var responses []*pb.ProposalResponse
 	for _, endorser := range endorserClients {
 		proposalResp, err := endorser.ProcessProposal(context.Background(), signedProp)
 		if err != nil {
 			return nil, errors.WithMessage(err, fmt.Sprintf("error endorsing %s", funcName))
 		}
-		responses = append(responses, proposalResp)
+		responses = append(responses, proposalResp.ProposalResponse[0])
 	}
 
 	if len(responses) == 0 {
