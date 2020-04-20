@@ -40,7 +40,15 @@ func (r *RuntimeLauncher) Launch(ccci *ccprovider.ChaincodeContainerInfo) error 
 	var timeoutCh <-chan time.Time
 
 	startTime := time.Now()
-	cname := ccci.Name + ":" + ccci.Version
+
+	systemCCs := []string{"cscc", "lscc", "qscc"}
+	cname := ccci.Name + ":" + ccci.Version + "-7052"
+	for _, v := range systemCCs {
+		if v == ccci.Name {
+			cname = ccci.Name + ":" + ccci.Version
+			break
+		}
+	}
 
 	// 获取链码容器当前的状态，是否已经启动，是正在运行
 	launchState, alreadyStarted := r.Registry.Launching(cname)

@@ -58,6 +58,7 @@ type ChaincodeSupport struct {
 	appConfig        ApplicationConfigRetriever
 	HandlerMetrics   *HandlerMetrics
 	LaunchMetrics    *LaunchMetrics
+	CCContainerName  string
 }
 
 // NewChaincodeSupport creates a new ChaincodeSupport instance.
@@ -75,6 +76,7 @@ func NewChaincodeSupport(
 	platformRegistry *platforms.Registry,
 	appConfig ApplicationConfigRetriever,
 	metricsProvider metrics.Provider,
+	ccname string,
 ) *ChaincodeSupport {
 	cs := &ChaincodeSupport{
 		UserRunsCC:       userRunsCC,
@@ -87,6 +89,7 @@ func NewChaincodeSupport(
 		appConfig:        appConfig,
 		HandlerMetrics:   NewHandlerMetrics(metricsProvider),
 		LaunchMetrics:    NewLaunchMetrics(metricsProvider),
+		CCContainerName:  ccname,
 	}
 
 	// Keep TestQueries working
@@ -135,7 +138,7 @@ func (cs *ChaincodeSupport) LaunchInit(ccci *ccprovider.ChaincodeContainerInfo) 
 // error. If the chaincode is already running, it simply returns.
 // 启动链码容器
 func (cs *ChaincodeSupport) Launch(chainID, chaincodeName, chaincodeVersion string, qe ledger.QueryExecutor) (*Handler, error) {
-	cname := chaincodeName + ":" + chaincodeVersion
+	cname := chaincodeName + ":" + chaincodeVersion + "-" + cs.CCContainerName
 	// 检查该链码容器是否已经注册，如果已注册则直接返回handler
 	// handler中含有与该容器绑定的gRPC通信流
 	if h := cs.HandlerRegistry.Handler(cname); h != nil {

@@ -470,11 +470,11 @@ func ChaincodeInvokeOrQuery(
 
 	var responses []*pb.ProposalResponse
 	for _, endorser := range endorserClients {
-		proposalResp, err := endorser.ProcessProposal(context.Background(), signedProp)
+		proposalResponses, err := endorser.ProcessProposal(context.Background(), signedProp)
 		if err != nil {
 			return nil, errors.WithMessage(err, fmt.Sprintf("error endorsing %s", funcName))
 		}
-		responses = append(responses, proposalResp.ProposalResponse[0])
+		responses = append(responses, proposalResponses.ProposalResponse[0])
 	}
 
 	if len(responses) == 0 {

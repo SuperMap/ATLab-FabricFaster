@@ -237,7 +237,9 @@ func (vm *DockerVM) Start(ccid ccintf.CCID, args, env []string, filesToUpload ma
 	}
 
 	attachStdout := viper.GetBool("vm.docker.attachStdout")
-	containerName := vm.GetVMName(ccid)
+	containerName := vm.GetVMName(ccid) + "-7052"
+	// 第二个链码容器名加 "-8052"后缀
+	containerName2 := vm.GetVMName(ccid) + "-8052"
 	logger := dockerLogger.With("imageName", imageName, "containerName", containerName)
 
 	client, err := vm.getClientFnc()
@@ -247,9 +249,11 @@ func (vm *DockerVM) Start(ccid ccintf.CCID, args, env []string, filesToUpload ma
 	}
 
 	vm.stopInternal(client, containerName, 0, false, false)
+	vm.stopInternal(client, containerName2, 0, false, false)
 
 	// 创建容器
 	err = vm.createContainer(client, imageName, containerName, args, env, attachStdout)
+	_ = vm.createContainer(client, imageName, containerName2, args, env, attachStdout)
 	// 如果没有镜像则先创建镜像
 	if err == docker.ErrNoSuchImage {
 		// 根据链码语言，使用不用的链码编译镜像（fabric-ccenv）将链码编译为可执行程序并打包为tar包，放入io流中
@@ -314,6 +318,9 @@ func (vm *DockerVM) Start(ccid ccintf.CCID, args, env []string, filesToUpload ma
 
 	// start container with HostConfig was deprecated since v1.10 and removed in v1.2
 	err = client.StartContainer(containerName, nil)
+
+	// TODO 启动第二个链码容器
+	_ = client.StartContainer(containerName2, nil)
 	if err != nil {
 		dockerLogger.Errorf("start-could not start container: %s", err)
 		return err
@@ -392,6 +399,7 @@ func (vm *DockerVM) Stop(ccid ccintf.CCID, timeout uint, dontkill bool, dontremo
 		return err
 	}
 	id := vm.ccidToContainerID(ccid)
+	id = id + "-7052"
 
 	return vm.stopInternal(client, id, timeout, dontkill, dontremove)
 }
@@ -404,6 +412,7 @@ func (vm *DockerVM) Wait(ccid ccintf.CCID) (int, error) {
 		return 0, err
 	}
 	id := vm.ccidToContainerID(ccid)
+	id = id + "-7052"
 
 	return client.WaitContainer(id)
 }

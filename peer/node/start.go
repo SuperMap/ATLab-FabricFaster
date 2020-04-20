@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"sync"
@@ -704,6 +705,7 @@ func registerChaincodeSupport(
 	pr *platforms.Registry,
 	lifecycleSCC *lifecycle.SCC,
 	ops *operations.System,
+	ccname string,
 ) (*chaincode.ChaincodeSupport, ccprovider.ChaincodeProvider, *scc.Provider) {
 	//get user mode
 	userRunsCC := chaincode.IsDevMode()
@@ -753,6 +755,7 @@ func registerChaincodeSupport(
 		pr,
 		peer.DefaultSupport,
 		ops.Provider,
+		ccname,
 	)
 	ipRegistry.ChaincodeSupport = chaincodeSupport
 	ccp := chaincode.NewProvider(chaincodeSupport)
@@ -825,6 +828,7 @@ func startChaincodeServer(
 	var ccp ccprovider.ChaincodeProvider
 	var sccp *scc.Provider
 	for idx, _ := range ccEndpoints {
+		parse, _ := url.Parse(ccEndpoints[idx])
 		chaincodeSupport, ccp, sccp = registerChaincodeSupport(
 			ccSrvs[idx],
 			ccEndpoints[idx],
@@ -834,6 +838,7 @@ func startChaincodeServer(
 			pr,
 			lifecycleSCC,
 			ops,
+			parse.Opaque,
 		)
 		chaincodeSupports = append(chaincodeSupports, chaincodeSupport)
 		//ccps = append(ccps, ccp)

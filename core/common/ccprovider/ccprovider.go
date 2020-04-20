@@ -506,7 +506,7 @@ type ChaincodeContainerInfo struct {
 type TransactionParams struct {
 	TxID                 string
 	ChannelID            string
-	SignedProp           *pb.SignedProposal
+	SignedProps          *pb.SignedProposals
 	Proposal             *pb.Proposal
 	TXSimulator          ledger.TxSimulator
 	HistoryQueryExecutor ledger.HistoryQueryExecutor

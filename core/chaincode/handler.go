@@ -626,7 +626,7 @@ func hasReadAccess(chaincodeName, collection string, txContext *TransactionConte
 		Collection: collection,
 	}
 
-	accessAllowed, err := txContext.CollectionStore.HasReadAccess(cc, txContext.SignedProp, txContext.TXSimulator)
+	accessAllowed, err := txContext.CollectionStore.HasReadAccess(cc, txContext.SignedProp.SignedProposal[0], txContext.TXSimulator)
 	if err != nil {
 		return false, err
 	}
@@ -1160,7 +1160,7 @@ func (h *Handler) HandleInvokeChaincode(msg *pb.ChaincodeMessage, txContext *Tra
 	}
 	chaincodeLogger.Debugf("[%s] C-call-C %s on channel %s", shorttxid(msg.Txid), targetInstance.ChaincodeName, targetInstance.ChainID)
 
-	err = h.checkACL(txContext.SignedProp, txContext.Proposal, targetInstance)
+	err = h.checkACL(txContext.SignedProp.SignedProposal[0], txContext.Proposal, targetInstance)
 	if err != nil {
 		chaincodeLogger.Errorf(
 			"[%s] C-call-C %s on channel %s failed check ACL [%v]: [%s]",
@@ -1178,7 +1178,7 @@ func (h *Handler) HandleInvokeChaincode(msg *pb.ChaincodeMessage, txContext *Tra
 	txParams := &ccprovider.TransactionParams{
 		TxID:                 msg.Txid,
 		ChannelID:            targetInstance.ChainID,
-		SignedProp:           txContext.SignedProp,
+		SignedProps:          txContext.SignedProp,
 		Proposal:             txContext.Proposal,
 		TXSimulator:          txContext.TXSimulator,
 		HistoryQueryExecutor: txContext.HistoryQueryExecutor,
@@ -1261,9 +1261,14 @@ func (h *Handler) Execute(txParams *ccprovider.TransactionParams, cccid *ccprovi
 		return nil, err
 	}
 	defer h.TXContexts.Delete(msg.ChannelId, msg.Txid)
-
-	if err := h.setChaincodeProposal(txParams.SignedProp, txParams.Proposal, msg); err != nil {
-		return nil, err
+	if txParams.SignedProps != nil {
+		if err := h.setChaincodeProposal(txParams.SignedProps.SignedProposal[0], txParams.Proposal, msg); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := h.setChaincodeProposal(nil, txParams.Proposal, msg); err != nil {
+			return nil, err
+		}
 	}
 
 	chaincodeLogger.Errorf("链码执行 发送执行请求前准备耗时 %dμs", time.Since(startTime).Microseconds())

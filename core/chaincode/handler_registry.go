@@ -128,7 +128,15 @@ func (r *HandlerRegistry) Handler(cname string) *Handler {
 func (r *HandlerRegistry) Register(h *Handler) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	key := h.chaincodeID.Name
+	key := h.chaincodeID.Name + "-7052"
+
+	systemCC := []string{"lscc:latest", "cscc:latest", "qscc:latest"}
+	for _, v := range systemCC {
+		if v == h.chaincodeID.Name {
+			key = h.chaincodeID.Name
+			break
+		}
+	}
 
 	if r.handlers[key] != nil {
 		chaincodeLogger.Debugf("duplicate registered handler(key:%s) return error", key)
