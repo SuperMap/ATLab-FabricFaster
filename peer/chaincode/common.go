@@ -66,7 +66,7 @@ func getChaincodeDeploymentSpec(spec *pb.ChaincodeSpec, crtPkg bool) (*pb.Chainc
 }
 
 // getChaincodeSpec get chaincode spec from the cli cmd pramameters
-func getChaincodeSpec(cmd *cobra.Command) (*pb.ChaincodeSpec, error) {
+func getChaincodeSpec(cmd *cobra.Command, bytes ...[]byte) (*pb.ChaincodeSpec, error) {
 	spec := &pb.ChaincodeSpec{}
 	if err := checkChaincodeCmdParams(cmd); err != nil {
 		// unset usage silence because it's a command line usage error
@@ -76,8 +76,14 @@ func getChaincodeSpec(cmd *cobra.Command) (*pb.ChaincodeSpec, error) {
 
 	// Build the spec
 	input := &pb.ChaincodeInput{}
-	if err := json.Unmarshal([]byte(chaincodeCtorJSON), &input); err != nil {
-		return spec, errors.Wrap(err, "chaincode argument error")
+	if len(bytes) > 0 {
+		if err := json.Unmarshal(bytes[0], &input); err != nil {
+			return spec, errors.Wrap(err, "chaincode argument error")
+		}
+	} else {
+		if err := json.Unmarshal([]byte(chaincodeCtorJSON), &input); err != nil {
+			return spec, errors.Wrap(err, "chaincode argument error")
+		}
 	}
 
 	chaincodeLang = strings.ToUpper(chaincodeLang)
@@ -90,9 +96,30 @@ func getChaincodeSpec(cmd *cobra.Command) (*pb.ChaincodeSpec, error) {
 }
 
 func chaincodeInvokeOrQuery(cmd *cobra.Command, invoke bool, cf *ChaincodeCmdFactory) (err error) {
-	spec, err := getChaincodeSpec(cmd)
-	if err != nil {
-		return err
+
+	// 多笔交易在参数数组中以数组的形式附加
+	// {"Args":[["GetRecordByKey","key"],["GetRecordByKey","key2"]]}
+	// 包含两笔交易请求：
+	// {"Args":["GetRecordByKey","key"]}
+	// {"Args":["GetRecordByKey","key2"]}
+	var f interface{}
+	json.Unmarshal([]byte(chaincodeCtorJSON), &f)
+	m := f.(map[string]interface{})
+	args := m["Args"]
+	argArray := args.([]interface{}) // 参数中的数组
+
+	// 将多次交易调用的参数分别执行
+	var specs []*pb.ChaincodeSpec
+	for _, v := range argArray {
+		chaincodeCtorJSONObj := make(map[string]interface{})
+		chaincodeCtorJSONObj["Args"] = v
+		jsonObj, _ := json.Marshal(chaincodeCtorJSONObj)
+
+		spec, err := getChaincodeSpec(cmd, jsonObj)
+		if err != nil {
+			return err
+		}
+		specs = append(specs, spec)
 	}
 
 	// call with empty txid to ensure production code generates a txid.
@@ -100,8 +127,8 @@ func chaincodeInvokeOrQuery(cmd *cobra.Command, invoke bool, cf *ChaincodeCmdFac
 	txID := ""
 
 	// 向背书节点发送交易提案并获取背书结果
-	proposalResp, err := ChaincodeInvokeOrQuery(
-		spec,
+	proposalResps, err := ChaincodeInvokeOrQuery(
+		specs,
 		channelID,
 		txID,
 		invoke,
@@ -111,6 +138,7 @@ func chaincodeInvokeOrQuery(cmd *cobra.Command, invoke bool, cf *ChaincodeCmdFac
 		cf.DeliverClients,
 		cf.BroadcastClient)
 
+	proposalResp := proposalResps.ProposalResponse[0]
 	if err != nil {
 		return errors.Errorf("%s - proposal response: %v", err, proposalResp)
 	}
@@ -131,26 +159,33 @@ func chaincodeInvokeOrQuery(cmd *cobra.Command, invoke bool, cf *ChaincodeCmdFac
 		}
 		logger.Infof("Chaincode invoke successful. result: %v", ca.Response)
 	} else {
-		if proposalResp == nil {
-			return errors.New("error during query: received nil proposal response")
-		}
-		if proposalResp.Endorsement == nil {
-			return errors.Errorf("endorsement failure during query. response: %v", proposalResp.Response)
-		}
+		for k, _ := range proposalResps.ProposalResponse {
+			proposalResp := proposalResps.ProposalResponse[k]
+			if err != nil {
+				return errors.Errorf("%s - proposal response: %v", err, proposalResp)
+			}
+			if proposalResp == nil {
+				return errors.New("error during query: received nil proposal response")
+			}
+			if proposalResp.Endorsement == nil {
+				return errors.Errorf("endorsement failure during query. response: %v", proposalResp.Response)
+			}
 
-		if chaincodeQueryRaw && chaincodeQueryHex {
-			return fmt.Errorf("options --raw (-r) and --hex (-x) are not compatible")
+			if chaincodeQueryRaw && chaincodeQueryHex {
+				return fmt.Errorf("options --raw (-r) and --hex (-x) are not compatible")
+			}
+			if chaincodeQueryRaw {
+				fmt.Println(proposalResp.Response.Payload)
+				return nil
+			}
+			if chaincodeQueryHex {
+				fmt.Printf("%x\n", proposalResp.Response.Payload)
+				return nil
+			}
+			fmt.Println(string(proposalResp.Response.Payload))
 		}
-		if chaincodeQueryRaw {
-			fmt.Println(proposalResp.Response.Payload)
-			return nil
-		}
-		if chaincodeQueryHex {
-			fmt.Printf("%x\n", proposalResp.Response.Payload)
-			return nil
-		}
-		fmt.Println(string(proposalResp.Response.Payload))
 	}
+
 	return nil
 }
 
@@ -426,7 +461,7 @@ func InitCmdFactory(cmdName string, isEndorserRequired, isOrdererRequired bool) 
 // NOTE - Query will likely go away as all interactions with the endorser are
 // Proposal and ProposalResponses
 func ChaincodeInvokeOrQuery(
-	spec *pb.ChaincodeSpec,
+	specs []*pb.ChaincodeSpec,
 	cID string,
 	txID string,
 	invoke bool,
@@ -435,65 +470,72 @@ func ChaincodeInvokeOrQuery(
 	endorserClients []pb.EndorserClient,
 	deliverClients []api.PeerDeliverClient,
 	bc common.BroadcastClient,
-) (*pb.ProposalResponse, error) {
-	// Build the ChaincodeInvocationSpec message
-	invocation := &pb.ChaincodeInvocationSpec{ChaincodeSpec: spec}
+) (*pb.ProposalResponses, error) {
 
-	creator, err := signer.Serialize()
-	if err != nil {
-		return nil, errors.WithMessage(err, fmt.Sprintf("error serializing identity for %s", signer.GetIdentifier()))
-	}
+	var signedProposals = new(pb.SignedProposals)
+	var prop *pb.Proposal
+	var txid string
 
 	funcName := "invoke"
 	if !invoke {
 		funcName = "query"
 	}
 
-	// extract the transient field if it exists
-	var tMap map[string][]byte
-	if transient != "" {
-		if err := json.Unmarshal([]byte(transient), &tMap); err != nil {
-			return nil, errors.Wrap(err, "error parsing transient string")
+	for _, spec := range specs {
+		// Build the ChaincodeInvocationSpec message
+		invocation := &pb.ChaincodeInvocationSpec{ChaincodeSpec: spec}
+
+		creator, err := signer.Serialize()
+		if err != nil {
+			return nil, errors.WithMessage(err, fmt.Sprintf("error serializing identity for %s", signer.GetIdentifier()))
 		}
+
+		// extract the transient field if it exists
+		var tMap map[string][]byte
+		if transient != "" {
+			if err := json.Unmarshal([]byte(transient), &tMap); err != nil {
+				return nil, errors.Wrap(err, "error parsing transient string")
+			}
+		}
+
+		prop, txid, err = putils.CreateChaincodeProposalWithTxIDAndTransient(pcommon.HeaderType_ENDORSER_TRANSACTION, cID, invocation, creator, txID, tMap)
+		if err != nil {
+			return nil, errors.WithMessage(err, fmt.Sprintf("error creating proposal for %s", funcName))
+		}
+
+		signedProp, err := putils.GetSignedProposal(prop, signer)
+		if err != nil {
+			return nil, errors.WithMessage(err, fmt.Sprintf("error creating signed proposal for %s", funcName))
+		}
+		signedProposals.SignedProposal = append(signedProposals.SignedProposal, signedProp)
 	}
 
-	prop, txid, err := putils.CreateChaincodeProposalWithTxIDAndTransient(pcommon.HeaderType_ENDORSER_TRANSACTION, cID, invocation, creator, txID, tMap)
-	if err != nil {
-		return nil, errors.WithMessage(err, fmt.Sprintf("error creating proposal for %s", funcName))
-	}
-
-	signedProp0, err := putils.GetSignedProposal(prop, signer)
-	if err != nil {
-		return nil, errors.WithMessage(err, fmt.Sprintf("error creating signed proposal for %s", funcName))
-	}
-	signedProp := &pb.SignedProposals{SignedProposal: []*pb.SignedProposal{signedProp0}}
-
-	var responses []*pb.ProposalResponse
+	var proposalResponses *pb.ProposalResponses
 	for _, endorser := range endorserClients {
-		proposalResponses, err := endorser.ProcessProposal(context.Background(), signedProp)
+		proposalResponses0, err := endorser.ProcessProposal(context.Background(), signedProposals)
 		if err != nil {
 			return nil, errors.WithMessage(err, fmt.Sprintf("error endorsing %s", funcName))
 		}
-		responses = append(responses, proposalResponses.ProposalResponse[0])
+		proposalResponses = proposalResponses0
 	}
 
-	if len(responses) == 0 {
+	if len(proposalResponses.ProposalResponse) == 0 {
 		// this should only happen if some new code has introduced a bug
 		return nil, errors.New("no proposal responses received - this might indicate a bug")
 	}
 	// all responses will be checked when the signed transaction is created.
 	// for now, just set this so we check the first response's status
-	proposalResp := responses[0]
+	proposalResp := proposalResponses.ProposalResponse[0]
 
 	if invoke {
 		if proposalResp != nil {
 			if proposalResp.Response.Status >= shim.ERRORTHRESHOLD {
-				return proposalResp, nil
+				return proposalResponses, nil
 			}
 			// assemble a signed transaction (it's an Envelope message)
-			env, err := putils.CreateSignedTx(prop, signer, responses...)
+			env, err := putils.CreateSignedTx(prop, signer, proposalResponses.ProposalResponse...)
 			if err != nil {
-				return proposalResp, errors.WithMessage(err, "could not assemble transaction")
+				return proposalResponses, errors.WithMessage(err, "could not assemble transaction")
 			}
 			var dg *deliverGroup
 			var ctx context.Context
@@ -512,7 +554,7 @@ func ChaincodeInvokeOrQuery(
 
 			// send the envelope for ordering
 			if err = bc.Send(env); err != nil {
-				return proposalResp, errors.WithMessage(err, fmt.Sprintf("error sending transaction for %s", funcName))
+				return proposalResponses, errors.WithMessage(err, fmt.Sprintf("error sending transaction for %s", funcName))
 			}
 
 			if dg != nil && ctx != nil {
@@ -525,7 +567,7 @@ func ChaincodeInvokeOrQuery(
 		}
 	}
 
-	return proposalResp, nil
+	return proposalResponses, nil
 }
 
 // deliverGroup holds all of the information needed to connect
