@@ -133,22 +133,38 @@ func (s *SupportImpl) ExecuteLegacyInit(txParams *ccprovider.TransactionParams, 
 
 // Execute a proposal and return the chaincode response
 //　执行提案并返回链码响应
-func (s *SupportImpl) Execute(txParams *ccprovider.TransactionParams, cid, name, version, txid string, signedProp *pb.SignedProposals, prop *pb.Proposal, input *pb.ChaincodeInput) (*pb.Response, *pb.ChaincodeEvent, error) {
-	// 创建链码上下文对象
-	cccid := &ccprovider.CCContext{
-		Name:    name,
-		Version: version,
-	}
+func (s *SupportImpl) Execute(txParams *ccprovider.TransactionParams, cid, name, version, txid string, signedProp *pb.SignedProposals, props []*pb.Proposal, inputs []*pb.ChaincodeInput) ([]*pb.Response, []*pb.ChaincodeEvent, error) {
+	var resps = *new([]*pb.Response)
+	var ccEvents = *new([]*pb.ChaincodeEvent)
+	var err error
 
 	// decorate the chaincode input
+	// 单例装饰器
 	decorators := library.InitRegistry(library.Config{}).Lookup(library.Decoration).([]decoration.Decorator)
-	input.Decorations = make(map[string][]byte)
-	input = decoration.Apply(prop, input, decorators...)
-	txParams.ProposalDecorations = input.Decorations
 
-	support := s.ChaincodeSupport[0]
+	for i, _ := range inputs {
+		input := inputs[i]
+		input.Decorations = make(map[string][]byte) // 目前还没有添加任何修饰
+		input = decoration.Apply(props[i], input, decorators...)
+		txParams.ProposalDecorations = input.Decorations
+		inputs[i] = input // 将装饰后的input重新放入inputs
+	}
+	// TODO 需要并行执行，目前还是串行
+	for i, support := range s.ChaincodeSupport {
+		// 创建链码上下文对象
+		cccid := &ccprovider.CCContext{
+			Name:    name,
+			Version: version + "-" + support.CCContainerName,
+		}
+		response, event, err := support.Execute(txParams, cccid, inputs[i])
+		if err != nil {
+			return resps, ccEvents, err
+		}
+		resps = append(resps, response)
+		ccEvents = append(ccEvents, event)
+	}
 
-	return support.Execute(txParams, cccid, input)
+	return resps, ccEvents, err
 }
 
 // GetChaincodeDefinition returns ccprovider.ChaincodeDefinition for the chaincode with the supplied name

@@ -172,6 +172,8 @@ type Handler struct {
 	mutex sync.Mutex
 	// streamDoneChan is closed when the chaincode stream terminates.
 	streamDoneChan chan struct{}
+
+	Flag string
 }
 
 // handleMessage is called by ProcessStream to dispatch messages.
@@ -522,6 +524,15 @@ func (h *Handler) HandleRegister(msg *pb.ChaincodeMessage) {
 		return
 	}
 
+	s := chaincodeID.Name
+	chaincodeID.Name += "-" + h.Flag
+	systemCCs := []string{"lscc:latest", "cscc:latest", "qscc:latest"}
+	for _, v := range systemCCs {
+		if v == s {
+			chaincodeID.Name = s
+			break
+		}
+	}
 	// Now register with the chaincodeSupport
 	h.chaincodeID = chaincodeID
 	err = h.Registry.Register(h)
@@ -1160,7 +1171,7 @@ func (h *Handler) HandleInvokeChaincode(msg *pb.ChaincodeMessage, txContext *Tra
 	}
 	chaincodeLogger.Debugf("[%s] C-call-C %s on channel %s", shorttxid(msg.Txid), targetInstance.ChaincodeName, targetInstance.ChainID)
 
-	err = h.checkACL(txContext.SignedProp.SignedProposal[0], txContext.Proposal, targetInstance)
+	err = h.checkACL(txContext.SignedProp.SignedProposal[0], txContext.Proposal[0], targetInstance)
 	if err != nil {
 		chaincodeLogger.Errorf(
 			"[%s] C-call-C %s on channel %s failed check ACL [%v]: [%s]",
@@ -1261,12 +1272,12 @@ func (h *Handler) Execute(txParams *ccprovider.TransactionParams, cccid *ccprovi
 		return nil, err
 	}
 	defer h.TXContexts.Delete(msg.ChannelId, msg.Txid)
-	if txParams.SignedProps != nil {
-		if err := h.setChaincodeProposal(txParams.SignedProps.SignedProposal[0], txParams.Proposal, msg); err != nil {
+	if txParams.SignedProps != nil && txParams.Proposal != nil {
+		if err := h.setChaincodeProposal(txParams.SignedProps.SignedProposal[0], txParams.Proposal[0], msg); err != nil {
 			return nil, err
 		}
 	} else {
-		if err := h.setChaincodeProposal(nil, txParams.Proposal, msg); err != nil {
+		if err := h.setChaincodeProposal(nil, nil, msg); err != nil {
 			return nil, err
 		}
 	}

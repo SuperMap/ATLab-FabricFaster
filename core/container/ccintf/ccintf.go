@@ -34,14 +34,19 @@ func GetCCHandlerKey() string {
 }
 
 //CCID encapsulates chaincode ID
+// 增加Flag用于识别同一个链码的多个容器
 type CCID struct {
 	Name    string
 	Version string
+	Flag    string
 }
 
 //GetName returns canonical chaincode name based on the fields of CCID
 func (ccid *CCID) GetName() string {
 	if ccid.Version != "" {
+		if ccid.Flag != "" {
+			return fmt.Sprintf("%s-%s-%s", ccid.Name, ccid.Version, ccid.Flag)
+		}
 		return fmt.Sprintf("%s-%s", ccid.Name, ccid.Version)
 	}
 	return ccid.Name

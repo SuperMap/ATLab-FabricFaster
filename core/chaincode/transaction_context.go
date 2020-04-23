@@ -18,7 +18,7 @@ import (
 type TransactionContext struct {
 	ChainID              string
 	SignedProp           *pb.SignedProposals
-	Proposal             *pb.Proposal
+	Proposal             []*pb.Proposal
 	ResponseNotifier     chan *pb.ChaincodeMessage
 	TXSimulator          ledger.TxSimulator
 	HistoryQueryExecutor ledger.HistoryQueryExecutor

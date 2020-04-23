@@ -71,6 +71,7 @@ func (c *ContainerRuntime) Start(ccci *ccprovider.ChaincodeContainerInfo, codePa
 		CCID: ccintf.CCID{
 			Name:    ccci.Name,
 			Version: ccci.Version,
+			Flag:    ccci.Flag,
 		},
 	}
 
@@ -87,6 +88,7 @@ func (c *ContainerRuntime) Stop(ccci *ccprovider.ChaincodeContainerInfo) error {
 		CCID: ccintf.CCID{
 			Name:    ccci.Name,
 			Version: ccci.Version,
+			Flag:    ccci.Flag,
 		},
 		Timeout:    0,
 		Dontremove: false,
@@ -111,6 +113,7 @@ func (c *ContainerRuntime) Wait(ccci *ccprovider.ChaincodeContainerInfo) (int, e
 		CCID: ccintf.CCID{
 			Name:    ccci.Name,
 			Version: ccci.Version,
+			Flag:    ccci.Flag,
 		},
 		Exited: func(exitCode int, err error) {
 			resultCh <- result{exitCode: exitCode, err: err}

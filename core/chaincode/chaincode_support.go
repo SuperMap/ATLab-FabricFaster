@@ -138,7 +138,7 @@ func (cs *ChaincodeSupport) LaunchInit(ccci *ccprovider.ChaincodeContainerInfo) 
 // error. If the chaincode is already running, it simply returns.
 // 启动链码容器
 func (cs *ChaincodeSupport) Launch(chainID, chaincodeName, chaincodeVersion string, qe ledger.QueryExecutor) (*Handler, error) {
-	cname := chaincodeName + ":" + chaincodeVersion + "-" + cs.CCContainerName
+	cname := chaincodeName + ":" + chaincodeVersion
 	// 检查该链码容器是否已经注册，如果已注册则直接返回handler
 	// handler中含有与该容器绑定的gRPC通信流
 	if h := cs.HandlerRegistry.Handler(cname); h != nil {
@@ -147,6 +147,8 @@ func (cs *ChaincodeSupport) Launch(chainID, chaincodeName, chaincodeVersion stri
 
 	// 获取链码容器信息，链码名、版本、语言、路径、容器类型等
 	ccci, err := cs.Lifecycle.ChaincodeContainerInfo(chaincodeName, qe)
+	ccci.Flag = cs.CCContainerName
+
 	if err != nil {
 		// TODO: There has to be a better way to do this...
 		// 正在使用开发者模式或链码尚未部署
@@ -195,6 +197,7 @@ func (cs *ChaincodeSupport) HandleChaincodeStream(stream ccintf.ChaincodeStream)
 		LedgerGetter:               peer.Default,
 		AppConfig:                  cs.appConfig,
 		Metrics:                    cs.HandlerMetrics,
+		Flag:                       cs.CCContainerName,
 	}
 
 	return handler.ProcessStream(stream)

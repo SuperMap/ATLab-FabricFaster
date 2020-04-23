@@ -42,7 +42,7 @@ func (r *RuntimeLauncher) Launch(ccci *ccprovider.ChaincodeContainerInfo) error 
 	startTime := time.Now()
 
 	systemCCs := []string{"cscc", "lscc", "qscc"}
-	cname := ccci.Name + ":" + ccci.Version + "-7052"
+	cname := ccci.Name + ":" + ccci.Version + "-" + ccci.Flag
 	for _, v := range systemCCs {
 		if v == ccci.Name {
 			cname = ccci.Name + ":" + ccci.Version

@@ -490,12 +490,14 @@ func (cd *ChaincodeData) String() string { return proto.CompactTextString(cd) }
 func (*ChaincodeData) ProtoMessage() {}
 
 // ChaincodeContainerInfo is yet another synonym for the data required to start/stop a chaincode.
+// 增加Flag用于识别同一个链码的多个容器
 type ChaincodeContainerInfo struct {
 	Name        string
 	Version     string
 	Path        string
 	Type        string
 	CodePackage []byte
+	Flag        string
 
 	// ContainerType is not a great name, but 'DOCKER' and 'SYSTEM' are the valid types
 	ContainerType string
@@ -507,7 +509,7 @@ type TransactionParams struct {
 	TxID                 string
 	ChannelID            string
 	SignedProps          *pb.SignedProposals
-	Proposal             *pb.Proposal
+	Proposal             []*pb.Proposal
 	TXSimulator          ledger.TxSimulator
 	HistoryQueryExecutor ledger.HistoryQueryExecutor
 	CollectionStore      privdata.CollectionStore
