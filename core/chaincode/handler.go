@@ -212,7 +212,7 @@ func (h *Handler) handleMessageCreatedState(msg *pb.ChaincodeMessage) error {
 func (h *Handler) handleMessageReadyState(msg *pb.ChaincodeMessage) error {
 	switch msg.Type {
 	case pb.ChaincodeMessage_COMPLETED, pb.ChaincodeMessage_ERROR:
-		h.Notify(msg)
+		h.Notify(msg) // 这个message是链码容器返回的，会写入TxContext的响应通道，Execute方法（1289行）中串行发送交易后，会异步等待该提醒消息
 
 	case pb.ChaincodeMessage_PUT_STATE:
 		go h.HandleTransaction(msg, h.HandlePutState)
@@ -1301,7 +1301,7 @@ func (h *Handler) Execute(txParams *ccprovider.TransactionParams, cccid *ccprovi
 		ccName := cccid.Name + ":" + cccid.Version
 		h.Metrics.ExecuteTimeouts.With("chaincode", ccName).Add(1)
 	case <-h.streamDone():
-		// 链码数据流终端
+		// 链码数据流中断
 		err = errors.New("chaincode stream terminated")
 	}
 	chaincodeLogger.Errorf("链码执行 发送执行请求耗时 %dμs", time.Since(startTime).Microseconds())

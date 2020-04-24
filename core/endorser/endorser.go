@@ -247,6 +247,7 @@ func (e *Endorser) SimulateProposal(txParams *ccprovider.TransactionParams, cid 
 		if err != nil {
 			return nil, nil, nil, nil, errors.WithMessage(err, fmt.Sprintf("make sure the chaincode %s has been successfully instantiated and try again", cid.Name))
 		}
+		// 要执行的链码版本不应该使用交易提案中指定的版本，应该使用系统中正在生效的版本。
 		version = cdLedger.CCVersion()
 
 		err = e.s.CheckInstantiationPolicy(cid.Name, version, cdLedger)
@@ -521,7 +522,7 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProps *pb.SignedPr
 	var historyQueryExecutor ledger.HistoryQueryExecutor
 	if acquireTxSimulator(chainID, vr.hdrExt.ChaincodeId) {
 		/**
-		TxSumulator中对账本加了锁，因此只能有一个TxSimulator执行。
+		TxSumulator中对账本管理器加了读写锁，因此只能有一个TxSimulator执行，否则invoke无法并行更新rw。
 		*/
 		var err error
 		if txsim, err = e.s.GetTxSimulator(chainID, txid); err != nil {

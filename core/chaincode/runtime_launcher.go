@@ -50,7 +50,7 @@ func (r *RuntimeLauncher) Launch(ccci *ccprovider.ChaincodeContainerInfo) error 
 		}
 	}
 
-	// 获取链码容器当前的状态，是否已经启动，是正在运行
+	// 获取链码容器当前的状态，是否已经启动，是否正在运行
 	launchState, alreadyStarted := r.Registry.Launching(cname)
 	if !alreadyStarted {
 		startFailCh = make(chan error, 1)
