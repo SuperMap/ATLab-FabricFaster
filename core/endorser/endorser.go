@@ -630,8 +630,6 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProps *pb.SignedPr
 
 		endorserLogger.Errorf("序号%d 背书阶段 endorseProposal() 签名背书耗时 %dμs", randNum, time.Since(simulateProposalStart).Microseconds())
 
-		endorserLogger.Errorf("序号%d 背书阶段总耗时 %dμs", randNum, time.Since(startTime).Microseconds())
-
 		// Set the proposal response payload - it
 		// contains the "return value" from the
 		// chaincode invocation
@@ -643,6 +641,7 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProps *pb.SignedPr
 
 		proposalReponses.ProposalResponse = append(proposalReponses.ProposalResponse, pResp)
 	}
+	endorserLogger.Errorf("序号%d 背书阶段总耗时 %dμs", randNum, time.Since(startTime).Microseconds())
 	return proposalReponses, nil
 	//return pResp, nil
 }
