@@ -149,21 +149,48 @@ func (s *SupportImpl) Execute(txParams *ccprovider.TransactionParams, cid, name,
 		txParams.ProposalDecorations = input.Decorations
 		inputs[i] = input // 将装饰后的input重新放入inputs
 	}
-	// TODO 需要并行执行，目前还是串行
-	for i, support := range s.ChaincodeSupport {
-		// 创建链码上下文对象
-		cccid := &ccprovider.CCContext{
-			Name:    name,
-			Version: version + "-" + support.CCContainerName,
-		}
-		response, event, err := support.Execute(txParams, cccid, inputs[i])
-		if err != nil {
-			return resps, ccEvents, err
-		}
-		resps = append(resps, response)
-		ccEvents = append(ccEvents, event)
+
+	cRes := make(chan *pb.Response, 2)
+	cCCEvt := make(chan *pb.ChaincodeEvent, 2)
+	cErr := make(chan error, 2)
+
+	// 并行执行交易
+	for i, _ := range s.ChaincodeSupport {
+		// 此support必须每次循环时创建一个示例，不能在循环时获取for中的value值，因为在for中每次都是为同一个对象赋值
+		support := s.ChaincodeSupport[i]
+
+		go func(index int, s *chaincode.ChaincodeSupport) {
+			// 创建链码上下文对象
+			cccid := &ccprovider.CCContext{
+				Name:    name,
+				Version: version + "-" + s.CCContainerName,
+			}
+			response, event, err := s.Execute(txParams, cccid, inputs[index])
+			cCCEvt <- event
+			cErr <- err
+			cRes <- response
+		}(i, support)
 	}
 
+EXIT:
+	for {
+		select {
+		case res := <-cRes:
+			if res != nil {
+				resps = append(resps, res)
+				ccEvents = append(ccEvents, <-cCCEvt)
+				err = <-cErr
+				if len(ccEvents) >= len(s.ChaincodeSupport) {
+					break EXIT
+				}
+			}
+		}
+	}
+
+	//for i := 1; i < cap(cRes); i++ {
+	//	resps = append(resps, <- cRes)
+	//	ccEvents = append(ccEvents, <- cCCEvt)
+	//}
 	return resps, ccEvents, err
 }
 

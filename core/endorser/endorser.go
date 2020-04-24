@@ -512,7 +512,7 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProps *pb.SignedPr
 
 	prop, hdrExt, chainID, txid := vr.prop, vr.hdrExt, vr.chainID, vr.txid
 
-	endorserLogger.Errorf("序号%d 背书阶段 preProcess() 验证时间 %dμs", randNum, time.Since(startTime).Microseconds())
+	endorserLogger.Errorf("序号%d 背书阶段 preProcess() 验证耗时 %dμs", randNum, time.Since(startTime).Microseconds())
 
 	preProcessStart := time.Now()
 	// obtaining once the tx simulator for this proposal. This will be nil
@@ -590,7 +590,7 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProps *pb.SignedPr
 	//
 	//	}
 	//}
-	endorserLogger.Errorf("序号%d 背书阶段 simulateProposalStart() 模拟时间 %dμs", randNum, time.Since(preProcessStart).Microseconds())
+	endorserLogger.Errorf("序号%d 背书阶段 SimulateProposal() 模拟时间 %dμs", randNum, time.Since(preProcessStart).Microseconds())
 
 	simulateProposalStart := time.Now()
 	// 2 -- endorse and get a marshalled ProposalResponse message
@@ -628,9 +628,9 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProps *pb.SignedPr
 			}
 		}
 
-		endorserLogger.Errorf("序号%d 背书阶段 endorseProposal() 签名背书时间 %dμs", randNum, time.Since(simulateProposalStart).Microseconds())
+		endorserLogger.Errorf("序号%d 背书阶段 endorseProposal() 签名背书耗时 %dμs", randNum, time.Since(simulateProposalStart).Microseconds())
 
-		endorserLogger.Errorf("序号%d 背书阶段总时间 %dμs", randNum, time.Since(startTime).Microseconds())
+		endorserLogger.Errorf("序号%d 背书阶段总耗时 %dμs", randNum, time.Since(startTime).Microseconds())
 
 		// Set the proposal response payload - it
 		// contains the "return value" from the
@@ -643,7 +643,6 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProps *pb.SignedPr
 
 		proposalReponses.ProposalResponse = append(proposalReponses.ProposalResponse, pResp)
 	}
-
 	return proposalReponses, nil
 	//return pResp, nil
 }

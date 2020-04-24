@@ -386,6 +386,9 @@ type CCContext struct {
 
 	// Version used to construct the chaincode image and register
 	Version string
+
+	// 标识一笔交易中使用不同端口号的链码
+	Flag string
 }
 
 // GetCanonicalName returns the canonical name associated with the proposal context

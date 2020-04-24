@@ -147,7 +147,7 @@ func (cs *ChaincodeSupport) Launch(chainID, chaincodeName, chaincodeVersion stri
 
 	// 获取链码容器信息，链码名、版本、语言、路径、容器类型等
 	ccci, err := cs.Lifecycle.ChaincodeContainerInfo(chaincodeName, qe)
-	ccci.Flag = cs.CCContainerName
+	ccci.Flag = cs.CCContainerName // 将端口号存入标记位
 
 	if err != nil {
 		// TODO: There has to be a better way to do this...

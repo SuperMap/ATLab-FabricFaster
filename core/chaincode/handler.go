@@ -1273,8 +1273,14 @@ func (h *Handler) Execute(txParams *ccprovider.TransactionParams, cccid *ccprovi
 	}
 	defer h.TXContexts.Delete(msg.ChannelId, msg.Txid)
 	if txParams.SignedProps != nil && txParams.Proposal != nil {
-		if err := h.setChaincodeProposal(txParams.SignedProps.SignedProposal[0], txParams.Proposal[0], msg); err != nil {
-			return nil, err
+		if h.Flag == "8052" {
+			if err := h.setChaincodeProposal(txParams.SignedProps.SignedProposal[1], txParams.Proposal[1], msg); err != nil {
+				return nil, err
+			}
+		} else {
+			if err := h.setChaincodeProposal(txParams.SignedProps.SignedProposal[0], txParams.Proposal[0], msg); err != nil {
+				return nil, err
+			}
 		}
 	} else {
 		if err := h.setChaincodeProposal(nil, nil, msg); err != nil {
@@ -1316,6 +1322,7 @@ func (h *Handler) setChaincodeProposal(signedProp *pb.SignedProposal, prop *pb.P
 	// TODO: This doesn't make a lot of sense. Feels like both are required or
 	// neither should be set. Check with a knowledgeable expert.
 	if prop != nil {
+		// TODO 这个地方加进去之后和不加好像对后续的操作没什么影响，以后发现问题的时候可以验证一下这里？？？
 		msg.Proposal = signedProp
 	}
 	return nil
