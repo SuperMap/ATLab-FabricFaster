@@ -175,14 +175,17 @@ func (s *SupportImpl) Execute(txParams *ccprovider.TransactionParams, cid, name,
 EXIT:
 	for {
 		select {
-		case res := <-cRes:
-			if res != nil {
-				resps = append(resps, res)
-				ccEvents = append(ccEvents, <-cCCEvt)
-				err = <-cErr
-				if len(ccEvents) >= len(s.ChaincodeSupport) {
-					break EXIT
-				}
+		case err = <-cErr:
+			res := <-cRes
+			evt := <-cCCEvt
+			resps = append(resps, res)
+			ccEvents = append(ccEvents, evt)
+			if len(resps) >= len(s.ChaincodeSupport) {
+				break EXIT
+			}
+			if err != nil {
+				resps[0] = res
+				ccEvents[0] = evt
 			}
 		}
 	}

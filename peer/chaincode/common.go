@@ -419,6 +419,8 @@ func InitCmdFactory(cmdName string, isEndorserRequired, isOrdererRequired bool) 
 	var broadcastClient common.BroadcastClient
 	if isOrdererRequired {
 		if len(common.OrderingEndpoint) == 0 {
+			// 如果invoke执行时没有指明orderer，则会执行如下过程
+			// TODO 如下过程执行会失败，因为参数传递没有修改为数组
 			if len(endorserClients) == 0 {
 				return nil, errors.New("orderer is required, but no ordering endpoint or endorser client supplied")
 			}
