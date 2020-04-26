@@ -569,29 +569,29 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProps *pb.SignedPr
 		return &pb.ProposalResponses{ProposalResponse: []*pb.ProposalResponse{response}}, nil
 		//return &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}, nil
 	}
-	//if reponses != nil {
-	//	// 出错时，错误的信息放入响应数组的第一个，其中的多笔交易都失败
-	//	res := reponses[0]
-	//	if res.Status >= shim.ERROR {
-	//		endorserLogger.Errorf("[%s][%s] simulateProposal() resulted in chaincode %s response status %d for txid: %s", chainID, shorttxid(txid), hdrExt.ChaincodeId, res.Status, txid)
-	//		var cceventBytes []byte
-	//		ccevent := ccevents[0]
-	//		if ccevent != nil {
-	//			cceventBytes, err = putils.GetBytesChaincodeEvent(ccevent)
-	//			if err != nil {
-	//				return nil, errors.Wrap(err, "failed to marshal event bytes")
-	//			}
-	//		}
-	//		pResp, err := putils.CreateProposalResponseFailure(prop.Header, prop.Payload, res, simulationResult, cceventBytes, hdrExt.ChaincodeId, hdrExt.PayloadVisibility)
-	//		if err != nil {
-	//			//return &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}, nil
-	//			response := &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}
-	//			return &pb.ProposalResponses{ProposalResponse: []*pb.ProposalResponse{response}}, nil
-	//
-	//		}
-	//		return &pb.ProposalResponses{ProposalResponse: []*pb.ProposalResponse{pResp}}, nil
-	//	}
-	//}
+	if reponses != nil {
+		// 出错时，错误的信息放入响应数组的第一个，其中的多笔交易都失败
+		res := reponses[0]
+		if res.Status >= shim.ERROR {
+			endorserLogger.Errorf("[%s][%s] simulateProposal() resulted in chaincode %s response status %d for txid: %s", chainID, shorttxid(txid), hdrExt.ChaincodeId, res.Status, txid)
+			var cceventBytes []byte
+			ccevent := ccevents[0]
+			if ccevent != nil {
+				cceventBytes, err = putils.GetBytesChaincodeEvent(ccevent)
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to marshal event bytes")
+				}
+			}
+			pResp, err := putils.CreateProposalResponseFailure(prop.Header, prop.Payload, res, simulationResult, cceventBytes, hdrExt.ChaincodeId, hdrExt.PayloadVisibility)
+			if err != nil {
+				//return &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}, nil
+				response := &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}
+				return &pb.ProposalResponses{ProposalResponse: []*pb.ProposalResponse{response}}, nil
+
+			}
+			return &pb.ProposalResponses{ProposalResponse: []*pb.ProposalResponse{pResp}}, nil
+		}
+	}
 	//endorserLogger.Errorf("序号%d 背书阶段 SimulateProposal() 模拟时间 %dμs", randNum, time.Since(preProcessStart).Microseconds())
 	//simulateProposalStart := time.Now()
 
