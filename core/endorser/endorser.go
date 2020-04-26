@@ -512,9 +512,9 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProps *pb.SignedPr
 
 	prop, hdrExt, chainID, txid := vr.prop, vr.hdrExt, vr.chainID, vr.txid
 
-	endorserLogger.Errorf("序号%d 背书阶段 preProcess() 验证耗时 %dμs", randNum, time.Since(startTime).Microseconds())
+	//endorserLogger.Errorf("序号%d 背书阶段 preProcess() 验证耗时 %dμs", randNum, time.Since(startTime).Microseconds())
+	//preProcessStart := time.Now()
 
-	preProcessStart := time.Now()
 	// obtaining once the tx simulator for this proposal. This will be nil
 	// for chainless proposals
 	// Also obtain a history query executor for history queries, since tx simulator does not cover history
@@ -569,32 +569,32 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProps *pb.SignedPr
 		return &pb.ProposalResponses{ProposalResponse: []*pb.ProposalResponse{response}}, nil
 		//return &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}, nil
 	}
-	if reponses != nil {
-		// 出错时，错误的信息放入响应数组的第一个，其中的多笔交易都失败
-		res := reponses[0]
-		if res.Status >= shim.ERROR {
-			endorserLogger.Errorf("[%s][%s] simulateProposal() resulted in chaincode %s response status %d for txid: %s", chainID, shorttxid(txid), hdrExt.ChaincodeId, res.Status, txid)
-			var cceventBytes []byte
-			ccevent := ccevents[0]
-			if ccevent != nil {
-				cceventBytes, err = putils.GetBytesChaincodeEvent(ccevent)
-				if err != nil {
-					return nil, errors.Wrap(err, "failed to marshal event bytes")
-				}
-			}
-			pResp, err := putils.CreateProposalResponseFailure(prop.Header, prop.Payload, res, simulationResult, cceventBytes, hdrExt.ChaincodeId, hdrExt.PayloadVisibility)
-			if err != nil {
-				//return &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}, nil
-				response := &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}
-				return &pb.ProposalResponses{ProposalResponse: []*pb.ProposalResponse{response}}, nil
+	//if reponses != nil {
+	//	// 出错时，错误的信息放入响应数组的第一个，其中的多笔交易都失败
+	//	res := reponses[0]
+	//	if res.Status >= shim.ERROR {
+	//		endorserLogger.Errorf("[%s][%s] simulateProposal() resulted in chaincode %s response status %d for txid: %s", chainID, shorttxid(txid), hdrExt.ChaincodeId, res.Status, txid)
+	//		var cceventBytes []byte
+	//		ccevent := ccevents[0]
+	//		if ccevent != nil {
+	//			cceventBytes, err = putils.GetBytesChaincodeEvent(ccevent)
+	//			if err != nil {
+	//				return nil, errors.Wrap(err, "failed to marshal event bytes")
+	//			}
+	//		}
+	//		pResp, err := putils.CreateProposalResponseFailure(prop.Header, prop.Payload, res, simulationResult, cceventBytes, hdrExt.ChaincodeId, hdrExt.PayloadVisibility)
+	//		if err != nil {
+	//			//return &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}, nil
+	//			response := &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}
+	//			return &pb.ProposalResponses{ProposalResponse: []*pb.ProposalResponse{response}}, nil
+	//
+	//		}
+	//		return &pb.ProposalResponses{ProposalResponse: []*pb.ProposalResponse{pResp}}, nil
+	//	}
+	//}
+	//endorserLogger.Errorf("序号%d 背书阶段 SimulateProposal() 模拟时间 %dμs", randNum, time.Since(preProcessStart).Microseconds())
+	//simulateProposalStart := time.Now()
 
-			}
-			return &pb.ProposalResponses{ProposalResponse: []*pb.ProposalResponse{pResp}}, nil
-		}
-	}
-	endorserLogger.Errorf("序号%d 背书阶段 SimulateProposal() 模拟时间 %dμs", randNum, time.Since(preProcessStart).Microseconds())
-
-	simulateProposalStart := time.Now()
 	// 2 -- endorse and get a marshalled ProposalResponse message
 
 	for i, res := range reponses {
@@ -630,7 +630,7 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProps *pb.SignedPr
 			}
 		}
 
-		endorserLogger.Errorf("序号%d 背书阶段 endorseProposal() 签名背书耗时 %dμs", randNum, time.Since(simulateProposalStart).Microseconds())
+		//endorserLogger.Errorf("序号%d 背书阶段 endorseProposal() 签名背书耗时 %dμs", randNum, time.Since(simulateProposalStart).Microseconds())
 
 		// Set the proposal response payload - it
 		// contains the "return value" from the

@@ -298,14 +298,14 @@ func (cs *ChaincodeSupport) InvokeInit(txParams *ccprovider.TransactionParams, c
 // The chaincode will be launched if it is not already running.
 // 调用链码
 func (cs *ChaincodeSupport) Invoke(txParams *ccprovider.TransactionParams, cccid *ccprovider.CCContext, input *pb.ChaincodeInput) (*pb.ChaincodeMessage, error) {
-	startTime := time.Now()
+	//startTime := time.Now()
 	// 启动链码容器
 	h, err := cs.Launch(txParams.ChannelID, cccid.Name, cccid.Version, txParams.TXSimulator)
 	if err != nil {
 		return nil, err
 	}
 
-	chaincodeLogger.Errorf("启动链码容器耗时 %dμs：", time.Since(startTime).Microseconds())
+	//chaincodeLogger.Errorf("启动链码容器耗时 %dμs：", time.Since(startTime).Microseconds())
 
 	// TODO add Init exactly once semantics here once new lifecycle
 	// is available.  Enforced if the target channel is using the new lifecycle
@@ -325,7 +325,7 @@ func (cs *ChaincodeSupport) Invoke(txParams *ccprovider.TransactionParams, cccid
 
 // execute executes a transaction and waits for it to complete until a timeout value.
 func (cs *ChaincodeSupport) execute(cctyp pb.ChaincodeMessage_Type, txParams *ccprovider.TransactionParams, cccid *ccprovider.CCContext, input *pb.ChaincodeInput, h *Handler) (*pb.ChaincodeMessage, error) {
-	startTime := time.Now()
+	//startTime := time.Now()
 	input.Decorations = txParams.ProposalDecorations
 	// 解码proto并构造链码信息
 	ccMsg, err := createCCMessage(cctyp, txParams.ChannelID, txParams.TxID, input)
@@ -337,7 +337,7 @@ func (cs *ChaincodeSupport) execute(cctyp pb.ChaincodeMessage_Type, txParams *cc
 	if err != nil {
 		return nil, errors.WithMessage(err, fmt.Sprintf("error sending"))
 	}
-	chaincodeLogger.Errorf("调用执行链码 execte() 耗时 %dμs", time.Since(startTime).Microseconds())
+	//chaincodeLogger.Errorf("调用执行链码 execte() 耗时 %dμs", time.Since(startTime).Microseconds())
 
 	return ccresp, nil
 }
