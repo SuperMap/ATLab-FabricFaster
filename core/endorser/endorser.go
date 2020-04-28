@@ -222,8 +222,8 @@ func (e *Endorser) SimulateProposal(txParams *ccprovider.TransactionParams, cid 
 
 	inputs := *new([]*pb.ChaincodeInput)
 
-	randNum := rand.Intn(10000)
-	startTime := time.Now()
+	//randNum := rand.Intn(10000)
+	//startTime := time.Now()
 	// 遍历SignedProps，将链码输入信息写入inputs
 	for _, signedProposal := range txParams.SignedProps.SignedProposal {
 		// we do expect the payload to be a ChaincodeInvocationSpec
@@ -258,9 +258,7 @@ func (e *Endorser) SimulateProposal(txParams *ccprovider.TransactionParams, cid 
 		version = util.GetSysCCVersion()
 	}
 
-	endorserLogger.Errorf("序号%d 背书模拟阶段 检查链码信息耗时 %dμs", randNum, time.Since(startTime).Microseconds())
-
-	timeStartCallChaincode := time.Now()
+	//timeStartCallChaincode := time.Now()
 	// ---3. execute the proposal and get simulation results
 	var simResult *ledger.TxSimulationResults
 	var pubSimResBytes []byte
@@ -271,9 +269,9 @@ func (e *Endorser) SimulateProposal(txParams *ccprovider.TransactionParams, cid 
 		endorserLogger.Errorf("[%s][%s] failed to invoke chaincode %s, error: %+v", txParams.ChannelID, shorttxid(txParams.TxID), cid, err)
 		return nil, nil, nil, nil, err
 	}
-	endorserLogger.Errorf("序号%d 背书模拟阶段 链码执行耗时 %dμs", randNum, time.Since(timeStartCallChaincode).Microseconds())
+	//endorserLogger.Errorf("序号%d 背书模拟阶段 链码执行耗时 %dμs", randNum, time.Since(timeStartCallChaincode).Microseconds())
 
-	timePostCallChaincode := time.Now()
+	//timePostCallChaincode := time.Now()
 	if txParams.TXSimulator != nil {
 		if simResult, err = txParams.TXSimulator.GetTxSimulationResults(); err != nil {
 			txParams.TXSimulator.Done()
@@ -314,7 +312,7 @@ func (e *Endorser) SimulateProposal(txParams *ccprovider.TransactionParams, cid 
 			return nil, nil, nil, nil, err
 		}
 	}
-	endorserLogger.Errorf("序号%d 背书模拟阶段 模拟结果处理耗时 %dμs", randNum, time.Since(timePostCallChaincode).Microseconds())
+	//endorserLogger.Errorf("序号%d 背书模拟阶段 模拟结果处理耗时 %dμs", randNum, time.Since(timePostCallChaincode).Microseconds())
 
 	return cdLedger, responses, pubSimResBytes, ccevent, nil
 }
@@ -371,10 +369,15 @@ func (e *Endorser) endorseProposal(_ context.Context, chainID string, txid strin
 }
 
 // preProcess checks the tx proposal headers, uniqueness and ACL
-func (e *Endorser) preProcess(signedProp *pb.SignedProposal) (*validateResult, error) {
+func (e *Endorser) preProcess(signedProp *pb.SignedProposal, i int) (*validateResult, error) {
+	//startTime_p1 := time.Now()
+
 	vr := &validateResult{}
 	// at first, we check whether the message is valid
 	prop, hdr, hdrExt, err := validation.ValidateProposalMessage(signedProp)
+
+	//endorserLogger.Errorf("背书阶段 preProcess()_p1 验证耗时 %d μs", time.Since(startTime_p1).Microseconds())
+	//startTime_p1 = time.Now()
 
 	if err != nil {
 		e.Metrics.ProposalValidationFailed.Add(1)
@@ -382,66 +385,86 @@ func (e *Endorser) preProcess(signedProp *pb.SignedProposal) (*validateResult, e
 		return vr, err
 	}
 
-	chdr, err := putils.UnmarshalChannelHeader(hdr.ChannelHeader)
-	if err != nil {
-		vr.resp = &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}
-		return vr, err
-	}
+	var chainID string
+	var txid string
 
-	shdr, err := putils.GetSignatureHeader(hdr.SignatureHeader)
-	if err != nil {
-		vr.resp = &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}
-		return vr, err
-	}
-
-	// block invocations to security-sensitive system chaincodes
-	if e.s.IsSysCCAndNotInvokableExternal(hdrExt.ChaincodeId.Name) {
-		endorserLogger.Errorf("Error: an attempt was made by %#v to invoke system chaincode %s", shdr.Creator, hdrExt.ChaincodeId.Name)
-		err = errors.Errorf("chaincode %s cannot be invoked through a proposal", hdrExt.ChaincodeId.Name)
-		vr.resp = &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}
-		return vr, err
-	}
-
-	chainID := chdr.ChannelId
-	txid := chdr.TxId
-	endorserLogger.Debugf("[%s][%s] processing txid: %s", chainID, shorttxid(txid), txid)
-
-	if chainID != "" {
-		// labels that provide context for failure metrics
-		meterLabels := []string{
-			"channel", chainID,
-			"chaincode", hdrExt.ChaincodeId.Name + ":" + hdrExt.ChaincodeId.Version,
-		}
-
-		// Here we handle uniqueness check and ACLs for proposals targeting a chain
-		// Notice that ValidateProposalMessage has already verified that TxID is computed properly
-		if _, err = e.s.GetTransactionByID(chainID, txid); err == nil {
-			// increment failure due to duplicate transactions. Useful for catching replay attacks in
-			// addition to benign retries
-			e.Metrics.DuplicateTxsFailure.With(meterLabels...).Add(1)
-			err = errors.Errorf("duplicate transaction found [%s]. Creator [%x]", txid, shdr.Creator)
+	// 只验证一次交易，因为两次交易的数据除了args其他都一样。
+	if i < 1 {
+		chdr, err := putils.UnmarshalChannelHeader(hdr.ChannelHeader)
+		if err != nil {
 			vr.resp = &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}
 			return vr, err
 		}
 
-		// check ACL only for application chaincodes; ACLs
-		// for system chaincodes are checked elsewhere
-		if !e.s.IsSysCC(hdrExt.ChaincodeId.Name) {
-			// check that the proposal complies with the Channel's writers
-			if err = e.s.CheckACL(signedProp, chdr, shdr, hdrExt); err != nil {
-				e.Metrics.ProposalACLCheckFailed.With(meterLabels...).Add(1)
+		shdr, err := putils.GetSignatureHeader(hdr.SignatureHeader)
+		if err != nil {
+			vr.resp = &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}
+			return vr, err
+		}
+
+		//endorserLogger.Errorf("背书阶段 preProcess()_p2 验证耗时 %d μs", time.Since(startTime_p1).Microseconds())
+		//startTime_p1 = time.Now()
+
+		chainID = chdr.ChannelId
+		txid = chdr.TxId
+
+		// block invocations to security-sensitive system chaincodes
+		if e.s.IsSysCCAndNotInvokableExternal(hdrExt.ChaincodeId.Name) {
+			endorserLogger.Errorf("Error: an attempt was made by %#v to invoke system chaincode %s", shdr.Creator, hdrExt.ChaincodeId.Name)
+			err = errors.Errorf("chaincode %s cannot be invoked through a proposal", hdrExt.ChaincodeId.Name)
+			vr.resp = &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}
+			return vr, err
+		}
+		//endorserLogger.Errorf("背书阶段 preProcess()_p3 验证耗时 %d μs", time.Since(startTime_p1).Microseconds())
+		//startTime_p1 = time.Now()
+
+		endorserLogger.Debugf("[%s][%s] processing txid: %s", chainID, shorttxid(txid), txid)
+
+		if chainID != "" {
+			// labels that provide context for failure metrics
+			meterLabels := []string{
+				"channel", chainID,
+				"chaincode", hdrExt.ChaincodeId.Name + ":" + hdrExt.ChaincodeId.Version,
+			}
+
+			// Here we handle uniqueness check and ACLs for proposals targeting a chain
+			// Notice that ValidateProposalMessage has already verified that TxID is computed properly
+			// 处理重放攻击。根据在账本中查找交易，如果err不为空则说明不存在该交易，可以继续执行。
+			// 如果err==nil则说明，该交易已经在区块中存在，说明现在是在重复执行该交易。
+			if _, err = e.s.GetTransactionByID(chainID, txid); err == nil {
+				// increment failure due to duplicate transactions. Useful for catching replay attacks in
+				// addition to benign retries
+				e.Metrics.DuplicateTxsFailure.With(meterLabels...).Add(1)
+				err = errors.Errorf("duplicate transaction found [%s]. Creator [%x]", txid, shdr.Creator)
 				vr.resp = &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}
 				return vr, err
 			}
+
+			//endorserLogger.Errorf("背书阶段 preProcess()_p4 验证耗时 %d μs", time.Since(startTime_p1).Microseconds())
+			//startTime_p1 = time.Now()
+
+			// check ACL only for application chaincodes; ACLs
+			// for system chaincodes are checked elsewhere
+			if !e.s.IsSysCC(hdrExt.ChaincodeId.Name) {
+				// check that the proposal complies with the Channel's writers
+
+				if err = e.s.CheckACL(signedProp, chdr, shdr, hdrExt); err != nil {
+					e.Metrics.ProposalACLCheckFailed.With(meterLabels...).Add(1)
+					vr.resp = &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}
+					return vr, err
+				}
+				//endorserLogger.Errorf("背书阶段 preProcess()_p5 验证耗时 %d μs", time.Since(startTime_p1).Microseconds())
+			}
+		} else {
+			// chainless proposals do not/cannot affect ledger and cannot be submitted as transactions
+			// ignore uniqueness checks; also, chainless proposals are not validated using the policies
+			// of the chain since by definition there is no chain; they are validated against the local
+			// MSP of the peer instead by the call to ValidateProposalMessage above
 		}
-	} else {
-		// chainless proposals do not/cannot affect ledger and cannot be submitted as transactions
-		// ignore uniqueness checks; also, chainless proposals are not validated using the policies
-		// of the chain since by definition there is no chain; they are validated against the local
-		// MSP of the peer instead by the call to ValidateProposalMessage above
 	}
 
 	vr.prop, vr.hdrExt, vr.chainID, vr.txid = prop, hdrExt, chainID, txid
+
 	return vr, nil
 }
 
@@ -453,14 +476,15 @@ func (e *Endorser) preProcess(signedProp *pb.SignedProposal) (*validateResult, e
 3、endorseProposal()背书执行结果并返回背书响应
 */
 func (e *Endorser) ProcessProposal(ctx context.Context, signedProps *pb.SignedProposals) (*pb.ProposalResponses, error) {
-	// 提案响应数组
-	var proposalReponses = new(pb.ProposalResponses)
-	props := *new([]*pb.Proposal)
-
 	// 生成随机值，方便查看日志
 	randNum := rand.Intn(10000)
 	// start time for computing elapsed time metric for successfully endorsed proposals
 	startTime := time.Now()
+
+	// 提案响应数组
+	var proposalReponses = new(pb.ProposalResponses)
+	props := *new([]*pb.Proposal)
+
 	e.Metrics.ProposalsReceived.Add(1)
 
 	addr := util.ExtractRemoteAddress(ctx)
@@ -488,7 +512,7 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProps *pb.SignedPr
 
 	// 0 -- check and validate
 	var vr *validateResult
-	for _, signedProp := range signedProps.SignedProposal {
+	for i, signedProp := range signedProps.SignedProposal {
 		/**
 		preProcess中的验证:
 		1.解码各种proto，如果解码失败就表示验证失败，返回err
@@ -498,7 +522,8 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProps *pb.SignedPr
 		txid仅使用第一个。
 		*/
 
-		vr0, err := e.preProcess(signedProp)
+		vr0, err := e.preProcess(signedProp, i)
+
 		if vr == nil {
 			vr = vr0
 		}
@@ -510,17 +535,17 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProps *pb.SignedPr
 		props = append(props, vr0.prop)
 	}
 
-	prop, hdrExt, chainID, txid := vr.prop, vr.hdrExt, vr.chainID, vr.txid
+	hdrExt, chainID, txid := vr.hdrExt, vr.chainID, vr.txid
 
-	//endorserLogger.Errorf("序号%d 背书阶段 preProcess() 验证耗时 %dμs", randNum, time.Since(startTime).Microseconds())
-	//preProcessStart := time.Now()
+	endorserLogger.Errorf("序号%d 背书阶段 preProcess() 验证耗时 %d μs", randNum, time.Since(startTime).Microseconds())
+	startTime2 := time.Now()
 
 	// obtaining once the tx simulator for this proposal. This will be nil
 	// for chainless proposals
 	// Also obtain a history query executor for history queries, since tx simulator does not cover history
 	var txsim ledger.TxSimulator
 	var historyQueryExecutor ledger.HistoryQueryExecutor
-	if acquireTxSimulator(chainID, vr.hdrExt.ChaincodeId) {
+	if acquireTxSimulator(chainID, hdrExt.ChaincodeId) {
 		/**
 		TxSumulator中对账本管理器加了读写锁，因此只能有一个TxSimulator执行，否则invoke无法并行更新rw。
 		*/
@@ -582,7 +607,7 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProps *pb.SignedPr
 					return nil, errors.Wrap(err, "failed to marshal event bytes")
 				}
 			}
-			pResp, err := putils.CreateProposalResponseFailure(prop.Header, prop.Payload, res, simulationResult, cceventBytes, hdrExt.ChaincodeId, hdrExt.PayloadVisibility)
+			pResp, err := putils.CreateProposalResponseFailure(props[0].Header, props[0].Payload, res, simulationResult, cceventBytes, hdrExt.ChaincodeId, hdrExt.PayloadVisibility)
 			if err != nil {
 				//return &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}, nil
 				response := &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}
@@ -592,8 +617,9 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProps *pb.SignedPr
 			return &pb.ProposalResponses{ProposalResponse: []*pb.ProposalResponse{pResp}}, nil
 		}
 	}
-	//endorserLogger.Errorf("序号%d 背书阶段 SimulateProposal() 模拟时间 %dμs", randNum, time.Since(preProcessStart).Microseconds())
-	//simulateProposalStart := time.Now()
+
+	endorserLogger.Errorf("序号%d 背书阶段 SimulateProposal() 模拟时间 %d μs", randNum, time.Since(startTime2).Microseconds())
+	startTime2 = time.Now()
 
 	// 2 -- endorse and get a marshalled ProposalResponse message
 
@@ -605,7 +631,7 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProps *pb.SignedPr
 			pResp = &pb.ProposalResponse{Response: res}
 		} else {
 			// Note: To endorseProposal(), we pass the released txsim. Hence, an error would occur if we try to use this txsim
-			pResp, err = e.endorseProposal(ctx, chainID, txid, signedProps.SignedProposal[i], prop, res, simulationResult, ccevents[0], hdrExt.PayloadVisibility, hdrExt.ChaincodeId, txsim, cd)
+			pResp, err = e.endorseProposal(ctx, chainID, txid, signedProps.SignedProposal[i], props[0], res, simulationResult, ccevents[0], hdrExt.PayloadVisibility, hdrExt.ChaincodeId, txsim, cd)
 
 			// if error, capture endorsement failure metric
 			meterLabels := []string{
@@ -630,8 +656,6 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProps *pb.SignedPr
 			}
 		}
 
-		//endorserLogger.Errorf("序号%d 背书阶段 endorseProposal() 签名背书耗时 %dμs", randNum, time.Since(simulateProposalStart).Microseconds())
-
 		// Set the proposal response payload - it
 		// contains the "return value" from the
 		// chaincode invocation
@@ -643,7 +667,10 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProps *pb.SignedPr
 
 		proposalReponses.ProposalResponse = append(proposalReponses.ProposalResponse, pResp)
 	}
-	endorserLogger.Errorf("序号%d 背书阶段总耗时 %dμs", randNum, time.Since(startTime).Microseconds())
+
+	endorserLogger.Errorf("序号%d 背书阶段 endorseProposal() 签名背书耗时 %d μs", randNum, time.Since(startTime2).Microseconds())
+
+	endorserLogger.Errorf("序号%d 背书阶段总耗时 %d μs", randNum, time.Since(startTime).Microseconds())
 	return proposalReponses, nil
 	//return pResp, nil
 }

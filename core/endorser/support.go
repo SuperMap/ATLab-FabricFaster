@@ -79,10 +79,12 @@ func (s *SupportImpl) GetHistoryQueryExecutor(ledgername string) (ledger.History
 
 // GetTransactionByID retrieves a transaction by id
 func (s *SupportImpl) GetTransactionByID(chid, txID string) (*pb.ProcessedTransaction, error) {
+	// 根据chid，获取对应通道的账本管理器
 	lgr := s.Peer.GetLedger(chid)
 	if lgr == nil {
 		return nil, errors.Errorf("failed to look up the ledger for Channel %s", chid)
 	}
+	// 在区块文件中查找交易txID，并获取交易状态码（是否有效）
 	tx, err := lgr.GetTransactionByID(txID)
 	if err != nil {
 		return nil, errors.WithMessage(err, "GetTransactionByID failed")
@@ -155,7 +157,7 @@ func (s *SupportImpl) Execute(txParams *ccprovider.TransactionParams, cid, name,
 	cErr := make(chan error, 2)
 
 	// 并行执行交易
-	for i, _ := range s.ChaincodeSupport {
+	for i, _ := range inputs {
 		// 此support必须每次循环时创建一个示例，不能在循环时获取for中的value值，因为在for中每次都是为同一个对象赋值
 		support := s.ChaincodeSupport[i]
 

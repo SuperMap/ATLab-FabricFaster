@@ -1263,7 +1263,7 @@ func (h *Handler) Execute(txParams *ccprovider.TransactionParams, cccid *ccprovi
 	chaincodeLogger.Debugf("Entry")
 	defer chaincodeLogger.Debugf("Exit")
 
-	startTime := time.Now()
+	//startTime := time.Now()
 	txParams.CollectionStore = h.getCollectionStore(msg.ChannelId)
 	txParams.IsInitTransaction = (msg.Type == pb.ChaincodeMessage_INIT)
 
@@ -1288,9 +1288,9 @@ func (h *Handler) Execute(txParams *ccprovider.TransactionParams, cccid *ccprovi
 		}
 	}
 
-	chaincodeLogger.Errorf("链码执行 发送执行请求前准备耗时 %dμs", time.Since(startTime).Microseconds())
+	//chaincodeLogger.Errorf("链码执行 发送执行请求前准备耗时 %dμs", time.Since(startTime).Microseconds())
 
-	startTime = time.Now()
+	//startTime = time.Now()
 	// 向链码容器发送消息
 	h.serialSendAsync(msg)
 
@@ -1310,7 +1310,7 @@ func (h *Handler) Execute(txParams *ccprovider.TransactionParams, cccid *ccprovi
 		// 链码数据流中断
 		err = errors.New("chaincode stream terminated")
 	}
-	chaincodeLogger.Errorf("链码执行 发送执行请求耗时 %dμs", time.Since(startTime).Microseconds())
+	//chaincodeLogger.Errorf("链码执行 发送执行请求耗时 %dμs", time.Since(startTime).Microseconds())
 
 	return ccresp, err
 }
