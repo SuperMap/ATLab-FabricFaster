@@ -7,10 +7,8 @@ SPDX-License-Identifier: Apache-2.0
 package ledgerstorage
 
 import (
-	"math/rand"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/hyperledger/fabric/common/flogging"
 	"github.com/hyperledger/fabric/common/ledger/blkstorage"
@@ -117,9 +115,6 @@ func (s *Store) CommitWithPvtData(blockAndPvtdata *ledger.BlockAndPvtData) error
 	s.rwlock.Lock()
 	defer s.rwlock.Unlock()
 
-	randNum := rand.Intn(10000)
-	startTime := time.Now()
-	// 处理私有数据
 	pvtBlkStoreHt, err := s.pvtdataStore.LastCommittedBlockHeight()
 	if err != nil {
 		return err
@@ -146,16 +141,11 @@ func (s *Store) CommitWithPvtData(blockAndPvtdata *ledger.BlockAndPvtData) error
 	} else {
 		logger.Debugf("Skipping writing block [%d] to pvt block store as the store height is [%d]", blockNum, pvtBlkStoreHt)
 	}
-	logger.Errorf("序号%d 记账提交区块 获取私有数据耗时 %dms", randNum, time.Since(startTime).Milliseconds())
 
-	startTime = time.Now()
-	// 保存区块到文件系统
 	if err := s.AddBlock(blockAndPvtdata.Block); err != nil {
 		s.pvtdataStore.Rollback()
 		return err
 	}
-	logger.Errorf("序号%d 记账提交区块 提交区块耗时 %dms", randNum, time.Since(startTime).Milliseconds())
-
 
 	if pvtBlkStoreHt == blockNum+1 {
 		// we reach here only when the pvtdataStore was ahead
@@ -164,14 +154,9 @@ func (s *Store) CommitWithPvtData(blockAndPvtdata *ledger.BlockAndPvtData) error
 		s.isPvtstoreAheadOfBlockstore.Store(false)
 	}
 
-	startTime = time.Now()
-	// 将私有数据保存在leveldb，私有数据库和区块的高度一致，保存每个区块的私有数据信息
 	if writtenToPvtStore {
-		err := s.pvtdataStore.Commit()
-		logger.Errorf("序号%d 记账提交区块 保存私有数据到levelDB耗时 %dms", randNum, time.Since(startTime).Milliseconds())
-		return err
+		return s.pvtdataStore.Commit()
 	}
-
 	return nil
 }
 

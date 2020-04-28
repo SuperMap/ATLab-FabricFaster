@@ -186,18 +186,15 @@ func GetOrdererEndpointOfChain(chainID string, signer msp.SigningIdentity, endor
 		return nil, errors.WithMessage(err, "error creating GetConfigBlock proposal")
 	}
 
-	signedProp0, err := putils.GetSignedProposal(prop, signer)
+	signedProp, err := putils.GetSignedProposal(prop, signer)
 	if err != nil {
 		return nil, errors.WithMessage(err, "error creating signed GetConfigBlock proposal")
 	}
 
-	signedProp := &pb.SignedProposals{SignedProposal: []*pb.SignedProposal{signedProp0}}
-	proposalResp0, err := endorserClient.ProcessProposal(context.Background(), signedProp)
+	proposalResp, err := endorserClient.ProcessProposal(context.Background(), signedProp)
 	if err != nil {
 		return nil, errors.WithMessage(err, "error endorsing GetConfigBlock")
 	}
-
-	proposalResp := proposalResp0.GetProposalResponse()[0]
 
 	if proposalResp == nil {
 		return nil, errors.WithMessage(err, "error nil proposal response")

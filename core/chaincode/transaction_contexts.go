@@ -61,7 +61,7 @@ func (c *TransactionContexts) Create(txParams *ccprovider.TransactionParams) (*T
 
 	txctx := &TransactionContext{
 		ChainID:              txParams.ChannelID,
-		SignedProp:           txParams.SignedProps,
+		SignedProp:           txParams.SignedProp,
 		Proposal:             txParams.Proposal,
 		ResponseNotifier:     make(chan *pb.ChaincodeMessage, 1),
 		TXSimulator:          txParams.TXSimulator,

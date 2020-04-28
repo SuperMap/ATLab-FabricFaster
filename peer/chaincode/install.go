@@ -71,20 +71,18 @@ func install(msg proto.Message, cf *ChaincodeCmdFactory) error {
 		return fmt.Errorf("Error creating proposal  %s: %s", chainFuncName, err)
 	}
 
-	var signedProp0 *pb.SignedProposal
-	signedProp0, err = utils.GetSignedProposal(prop, cf.Signer)
+	var signedProp *pb.SignedProposal
+	signedProp, err = utils.GetSignedProposal(prop, cf.Signer)
 	if err != nil {
 		return fmt.Errorf("Error creating signed proposal  %s: %s", chainFuncName, err)
 	}
 
-	signedProp := &pb.SignedProposals{SignedProposal: []*pb.SignedProposal{signedProp0}}
 	// install is currently only supported for one peer
-	proposalResponses, err := cf.EndorserClients[0].ProcessProposal(context.Background(), signedProp)
+	proposalResponse, err := cf.EndorserClients[0].ProcessProposal(context.Background(), signedProp)
 	if err != nil {
 		return fmt.Errorf("Error endorsing %s: %s", chainFuncName, err)
 	}
 
-	proposalResponse := proposalResponses.ProposalResponse[0]
 	if proposalResponse != nil {
 		if proposalResponse.Response.Status != int32(pcommon.Status_SUCCESS) {
 			return errors.Errorf("Bad response: %d - %s", proposalResponse.Response.Status, proposalResponse.Response.Message)

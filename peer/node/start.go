@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 	"sync"
@@ -54,7 +53,7 @@ import (
 	"github.com/hyperledger/fabric/core/container/dockercontroller"
 	"github.com/hyperledger/fabric/core/container/inproccontroller"
 	"github.com/hyperledger/fabric/core/endorser"
-	//authHandler "github.com/hyperledger/fabric/core/handlers/auth"
+	authHandler "github.com/hyperledger/fabric/core/handlers/auth"
 	endorsement2 "github.com/hyperledger/fabric/core/handlers/endorsement/api"
 	endorsement3 "github.com/hyperledger/fabric/core/handlers/endorsement/api/identities"
 	"github.com/hyperledger/fabric/core/handlers/library"
@@ -128,7 +127,6 @@ var nodeStartCmd = &cobra.Command{
 	},
 }
 
-// peer node start 程序执行入口
 func serve(args []string) error {
 	// currently the peer only works with the standard MSP
 	// because in certain scenarios the MSP has to make sure
@@ -237,8 +235,6 @@ func serve(args []string) error {
 		throttle.StreamServerInterceptor,
 	)
 
-	// peerServer 是 gRPC 服务，peer中的所有其他服务都通过注册到该gRPC服务进行处理
-	// TODO 启动PeerServer使用7051端口
 	peerServer, err := peer.NewPeerServer(listenAddr, serverConfig)
 	if err != nil {
 		logger.Fatalf("Failed to create peer server (%s)", err)
@@ -273,13 +269,7 @@ func serve(args []string) error {
 	pb.RegisterDeliverServer(peerServer.Server(), abServer)
 
 	// Initialize chaincode service
-	// 链码服务在背书服务中进行处理，背书服务注册在peer gRPC中，在执行完FilterChain中的所有AuthFilter后执行
-	// 启动链码服务器，即gRPC服务，监听7052端口
-	chaincodeSupports, ccp, sccp, packageProvider := startChaincodeServer(peerHost, aclProvider, pr, opsSystem, "8052")
-
-	// 用于PeerServer2的链码支持。链码gRPC使用8052端口
-	//chaincodeSupport2, _, _, _ := startChaincodeServer(peerHost, aclProvider, pr, opsSystem, "8052")
-	//println(chaincodeSupport2)
+	chaincodeSupport, ccp, sccp, packageProvider := startChaincodeServer(peerHost, aclProvider, pr, opsSystem)
 
 	logger.Debugf("Running peer")
 
@@ -302,25 +292,20 @@ func serve(args []string) error {
 	}
 	reg := library.InitRegistry(libConf)
 
-	// 背书时的各种验证都会追加到authFilters中
-	//authFilters := reg.Lookup(library.Auth).([]authHandler.Filter)
-
-	// 设置背书服务
-	endorsementPluginsByName := reg.Lookup(library.Endorsement).(map[string]endorsement2.PluginFactory)
-	validationPluginsByName := reg.Lookup(library.Validation).(map[string]validation.PluginFactory)
-	pluginMapper := endorser.MapBasedPluginMapper(endorsementPluginsByName)
-
+	authFilters := reg.Lookup(library.Auth).([]authHandler.Filter)
 	endorserSupport := &endorser.SupportImpl{
 		SignerSupport:    signingIdentity,
 		Peer:             peer.Default,
 		PeerSupport:      peer.DefaultSupport,
-		ChaincodeSupport: chaincodeSupports,
+		ChaincodeSupport: chaincodeSupport,
 		SysCCProvider:    sccp,
 		ACLProvider:      aclProvider,
 	}
-
+	endorsementPluginsByName := reg.Lookup(library.Endorsement).(map[string]endorsement2.PluginFactory)
+	validationPluginsByName := reg.Lookup(library.Validation).(map[string]validation.PluginFactory)
 	signingIdentityFetcher := (endorsement3.SigningIdentityFetcher)(endorserSupport)
 	channelStateRetriever := endorser.ChannelStateRetriever(endorserSupport)
+	pluginMapper := endorser.MapBasedPluginMapper(endorsementPluginsByName)
 	pluginEndorser := endorser.NewPluginEndorser(&endorser.PluginSupport{
 		ChannelStateRetriever:   channelStateRetriever,
 		TransientStoreRetriever: peer.TransientStoreFactory,
@@ -423,35 +408,27 @@ func serve(args []string) error {
 	logger.Infof("Started peer with ID=[%s], network ID=[%s], address=[%s]", peerEndpoint.Id, networkID, peerEndpoint.Address)
 
 	// check to see if the peer ledgers have been reset
-	// 检查该节点是否执行了peer node reste，如果reset则重新构建账本
-	//preResetHeights, err := kvledger.LoadPreResetHeight()
-	//if err != nil {
-	//	return fmt.Errorf("error loading prereset height: %s", err)
-	//}
-	//for cid, height := range preResetHeights {
-	//	logger.Infof("Ledger rebuild: channel [%s]: preresetHeight: [%d]", cid, height)
-	//}
-	//if len(preResetHeights) > 0 {
-	//	logger.Info("Ledger rebuild: Entering loop to check if current ledger heights surpass prereset ledger heights. Endorsement request processing will be disabled.")
-	//	resetFilter := &reset{
-	//		reject: true,
-	//	}
-	//
-	//	// 将reset过滤器加入到authFilters之后，确保权限验证通过之后，进行reset校验，如果之前peer被reset过，则需要同步区块
-	//	authFilters = append(authFilters, resetFilter)
-	//	//authFilters2 = append(authFilters2, resetFilter)
-	//	// 循环构建账本，直到获得完整账本
-	//	go resetLoop(resetFilter, preResetHeights, peer.GetLedger, 10*time.Second)
-	//}
+	preResetHeights, err := kvledger.LoadPreResetHeight()
+	if err != nil {
+		return fmt.Errorf("error loading prereset height: %s", err)
+	}
+	for cid, height := range preResetHeights {
+		logger.Infof("Ledger rebuild: channel [%s]: preresetHeight: [%d]", cid, height)
+	}
+	if len(preResetHeights) > 0 {
+		logger.Info("Ledger rebuild: Entering loop to check if current ledger heights surpass prereset ledger heights. Endorsement request processing will be disabled.")
+		resetFilter := &reset{
+			reject: true,
+		}
+		authFilters = append(authFilters, resetFilter)
+		go resetLoop(resetFilter, preResetHeights, peer.GetLedger, 10*time.Second)
+	}
 
 	// start the peer server
-	// 过滤器链，链中前边都是各种权限验证条件，最后是背书服务
-	//auth := authHandler.ChainFilters(serverEndorser, authFilters...)
+	auth := authHandler.ChainFilters(serverEndorser, authFilters...)
 	// Register the Endorser server
-	// 注册peerServer
-	pb.RegisterEndorserServer(peerServer.Server(), serverEndorser)
+	pb.RegisterEndorserServer(peerServer.Server(), auth)
 
-	// 启动peerServer
 	go func() {
 		var grpcErr error
 		if grpcErr = peerServer.Start(); grpcErr != nil {
@@ -531,11 +508,7 @@ func registerDiscoveryService(peerServer *comm.GRPCServer, polMgr policies.Chann
 }
 
 //create a CC listener using peer.chaincodeListenAddress (and if that's not set use peer.peerAddress)
-func createChaincodeServer(ca tlsgen.CA, peerHostname string, port ...[]string) (srvs []*comm.GRPCServer, ccEndpoints []string, err error) {
-	// 使用可变参，保证原有逻辑不变，当传入端口号时，使用传入的端口
-	var ccEndpoint string
-	var cclistenAddresses []string
-
+func createChaincodeServer(ca tlsgen.CA, peerHostname string) (srv *comm.GRPCServer, ccEndpoint string, err error) {
 	// before potentially setting chaincodeListenAddress, compute chaincode endpoint at first
 	ccEndpoint, err = computeChaincodeEndpoint(peerHostname)
 	if err != nil {
@@ -546,12 +519,8 @@ func createChaincodeServer(ca tlsgen.CA, peerHostname string, port ...[]string) 
 		} else {
 			// for non-dev mode, we have to return error
 			logger.Errorf("Error computing chaincode endpoint: %s", err)
-			return nil, ccEndpoints, err
+			return nil, "", err
 		}
-	}
-	ccEndpoints = append(ccEndpoints, ccEndpoint)
-	if port[0] != nil {
-		ccEndpoints = append(ccEndpoints, fmt.Sprintf("%s:%s", peerHostname, port[0][0]))
 	}
 
 	host, _, err := net.SplitHostPort(ccEndpoint)
@@ -565,16 +534,11 @@ func createChaincodeServer(ca tlsgen.CA, peerHostname string, port ...[]string) 
 		logger.Warningf("%s is not set, using %s", chaincodeListenAddrKey, cclistenAddress)
 		viper.Set(chaincodeListenAddrKey, cclistenAddress)
 	}
-	cclistenAddresses = append(cclistenAddresses, cclistenAddress)
-
-	if port[0] != nil {
-		cclistenAddresses = append(cclistenAddresses, fmt.Sprintf("0.0.0.0:%s", port[0][0]))
-	}
 
 	config, err := peer.GetServerConfig()
 	if err != nil {
 		logger.Errorf("Error getting server config: %s", err)
-		return nil, ccEndpoints, err
+		return nil, "", err
 	}
 
 	// set the logger for the server
@@ -610,16 +574,13 @@ func createChaincodeServer(ca tlsgen.CA, peerHostname string, port ...[]string) 
 	}
 	config.KaOpts = chaincodeKeepaliveOptions
 
-	for _, ccLisAddr := range cclistenAddresses {
-		srv, err := comm.NewGRPCServer(ccLisAddr, config)
-		if err != nil {
-			logger.Errorf("Error creating GRPC server: %s", err)
-			return nil, ccEndpoints, err
-		}
-		srvs = append(srvs, srv)
+	srv, err = comm.NewGRPCServer(cclistenAddress, config)
+	if err != nil {
+		logger.Errorf("Error creating GRPC server: %s", err)
+		return nil, "", err
 	}
 
-	return srvs, ccEndpoints, nil
+	return srv, ccEndpoint, nil
 }
 
 // computeChaincodeEndpoint will utilize chaincode address, chaincode listen
@@ -705,7 +666,6 @@ func registerChaincodeSupport(
 	pr *platforms.Registry,
 	lifecycleSCC *lifecycle.SCC,
 	ops *operations.System,
-	ccname string,
 ) (*chaincode.ChaincodeSupport, ccprovider.ChaincodeProvider, *scc.Provider) {
 	//get user mode
 	userRunsCC := chaincode.IsDevMode()
@@ -728,13 +688,10 @@ func registerChaincodeSupport(
 		dockerProvider.BuildMetrics,
 	)
 
-	// TODO 未进行错误处理
-	//  启动多个链码服务时，每个服务都要检查是否注册了检查器，出第一个外，其他服务发现已注册检查器就会报错
-	_ = ops.RegisterChecker("docker", dockerVM)
-	//err := ops.RegisterChecker("docker", dockerVM)
-	//if err != nil {
-	//	logger.Panicf("failed to register docker health check: %s", err)
-	//}
+	err := ops.RegisterChecker("docker", dockerVM)
+	if err != nil {
+		logger.Panicf("failed to register docker health check: %s", err)
+	}
 
 	chaincodeSupport := chaincode.NewChaincodeSupport(
 		chaincode.GlobalConfig(),
@@ -755,14 +712,12 @@ func registerChaincodeSupport(
 		pr,
 		peer.DefaultSupport,
 		ops.Provider,
-		ccname,
 	)
 	ipRegistry.ChaincodeSupport = chaincodeSupport
 	ccp := chaincode.NewProvider(chaincodeSupport)
 
 	ccSrv := pb.ChaincodeSupportServer(chaincodeSupport)
 	if tlsEnabled {
-		// 为 ccSrv 添加权限装饰
 		ccSrv = authenticator.Wrap(ccSrv)
 	}
 
@@ -788,8 +743,7 @@ func startChaincodeServer(
 	aclProvider aclmgmt.ACLProvider,
 	pr *platforms.Registry,
 	ops *operations.System,
-	port ...string,
-) ([]*chaincode.ChaincodeSupport, ccprovider.ChaincodeProvider, *scc.Provider, *persistence.PackageProvider) {
+) (*chaincode.ChaincodeSupport, ccprovider.ChaincodeProvider, *scc.Provider, *persistence.PackageProvider) {
 	// Setup chaincode path
 	chaincodeInstallPath := ccprovider.GetChaincodeInstallPathFromViper()
 	ccprovider.SetChaincodesPath(chaincodeInstallPath)
@@ -818,35 +772,22 @@ func startChaincodeServer(
 	if err != nil {
 		logger.Panic("Failed creating authentication layer:", err)
 	}
-	ccSrvs, ccEndpoints, err := createChaincodeServer(ca, peerHost, port)
+	ccSrv, ccEndpoint, err := createChaincodeServer(ca, peerHost)
 	if err != nil {
 		logger.Panicf("Failed to create chaincode server: %s", err)
 	}
-
-	var chaincodeSupports []*chaincode.ChaincodeSupport
-	var chaincodeSupport *chaincode.ChaincodeSupport
-	var ccp ccprovider.ChaincodeProvider
-	var sccp *scc.Provider
-	for idx, _ := range ccEndpoints {
-		parse, _ := url.Parse(ccEndpoints[idx])
-		chaincodeSupport, ccp, sccp = registerChaincodeSupport(
-			ccSrvs[idx],
-			ccEndpoints[idx],
-			ca,
-			packageProvider,
-			aclProvider,
-			pr,
-			lifecycleSCC,
-			ops,
-			parse.Opaque,
-		)
-		chaincodeSupports = append(chaincodeSupports, chaincodeSupport)
-		//ccps = append(ccps, ccp)
-		//sccps = append(sccps, sccp)
-		go ccSrvs[idx].Start()
-	}
-
-	return chaincodeSupports, ccp, sccp, packageProvider
+	chaincodeSupport, ccp, sccp := registerChaincodeSupport(
+		ccSrv,
+		ccEndpoint,
+		ca,
+		packageProvider,
+		aclProvider,
+		pr,
+		lifecycleSCC,
+		ops,
+	)
+	go ccSrv.Start()
+	return chaincodeSupport, ccp, sccp, packageProvider
 }
 
 func adminHasSeparateListener(peerListenAddr string, adminListenAddress string) bool {
@@ -1031,7 +972,6 @@ func resetLoop(
 	interval time.Duration,
 ) {
 	// periodically check to see if current ledger height(s) surpass prereset height(s)
-	// 定时器，定时检查账本是否构建完毕
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
@@ -1091,7 +1031,7 @@ func (r *reset) Init(next pb.EndorserServer) {
 }
 
 // ProcessProposal processes a signed proposal
-func (r *reset) ProcessProposal(ctx context.Context, signedProp *pb.SignedProposals) (*pb.ProposalResponses, error) {
+func (r *reset) ProcessProposal(ctx context.Context, signedProp *pb.SignedProposal) (*pb.ProposalResponse, error) {
 	r.RLock()
 	defer r.RUnlock()
 	if r.reject {

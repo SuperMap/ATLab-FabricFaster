@@ -611,7 +611,6 @@ func (s *GossipStateProviderImpl) deliverPayloads() {
 	}
 }
 
-// 反熵
 func (s *GossipStateProviderImpl) antiEntropy() {
 	defer s.done.Done()
 	defer logger.Debug("State Provider stopped, stopping anti entropy procedure.")

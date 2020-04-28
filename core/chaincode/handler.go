@@ -172,8 +172,6 @@ type Handler struct {
 	mutex sync.Mutex
 	// streamDoneChan is closed when the chaincode stream terminates.
 	streamDoneChan chan struct{}
-
-	Flag string
 }
 
 // handleMessage is called by ProcessStream to dispatch messages.
@@ -186,17 +184,14 @@ func (h *Handler) handleMessage(msg *pb.ChaincodeMessage) error {
 
 	switch h.state {
 	case Created:
-		// 链码容器已经创建，接下来需要注册
 		return h.handleMessageCreatedState(msg)
 	case Ready:
-		// 链码容器已经准备好，可以处理链码调用的各种请求
 		return h.handleMessageReadyState(msg)
 	default:
 		return errors.Errorf("handle message: invalid state %s for transaction %s", h.state, msg.Txid)
 	}
 }
 
-// 处理链码已经创建完毕之后的消息
 func (h *Handler) handleMessageCreatedState(msg *pb.ChaincodeMessage) error {
 	switch msg.Type {
 	case pb.ChaincodeMessage_REGISTER:
@@ -207,12 +202,10 @@ func (h *Handler) handleMessageCreatedState(msg *pb.ChaincodeMessage) error {
 	return nil
 }
 
-// 处理链码容器已经准备好的消息
-// 处理链码容器发来的请求
 func (h *Handler) handleMessageReadyState(msg *pb.ChaincodeMessage) error {
 	switch msg.Type {
 	case pb.ChaincodeMessage_COMPLETED, pb.ChaincodeMessage_ERROR:
-		h.Notify(msg) // 这个message是链码容器返回的，会写入TxContext的响应通道，Execute方法（1289行）中串行发送交易后，会异步等待该提醒消息
+		h.Notify(msg)
 
 	case pb.ChaincodeMessage_PUT_STATE:
 		go h.HandleTransaction(msg, h.HandlePutState)
@@ -349,7 +342,6 @@ func (h *Handler) serialSend(msg *pb.ChaincodeMessage) error {
 // can be nonblocking. Only errors need to be handled and these are handled by
 // communication on supplied error channel. A typical use will be a non-blocking or
 // nil channel
-// 串行发送，异步等待结果
 func (h *Handler) serialSendAsync(msg *pb.ChaincodeMessage) {
 	go func() {
 		if err := h.serialSend(msg); err != nil {
@@ -360,7 +352,6 @@ func (h *Handler) serialSendAsync(msg *pb.ChaincodeMessage) {
 				Txid:      msg.Txid,
 				ChannelId: msg.ChannelId,
 			}
-			// 写入通知信息
 			h.Notify(resp)
 
 			// surface send error to stream processing
@@ -408,7 +399,6 @@ func (h *Handler) streamDone() <-chan struct{} {
 	return h.streamDoneChan
 }
 
-// 背书服务（Peer节点中）处理gRPC的流，这里处理的是链码容器的信息
 func (h *Handler) ProcessStream(stream ccintf.ChaincodeStream) error {
 	defer h.deregister()
 
@@ -524,15 +514,6 @@ func (h *Handler) HandleRegister(msg *pb.ChaincodeMessage) {
 		return
 	}
 
-	s := chaincodeID.Name
-	chaincodeID.Name += "-" + h.Flag
-	systemCCs := []string{"lscc:latest", "cscc:latest", "qscc:latest"}
-	for _, v := range systemCCs {
-		if v == s {
-			chaincodeID.Name = s
-			break
-		}
-	}
 	// Now register with the chaincodeSupport
 	h.chaincodeID = chaincodeID
 	err = h.Registry.Register(h)
@@ -560,7 +541,6 @@ func (h *Handler) HandleRegister(msg *pb.ChaincodeMessage) {
 	h.notifyRegistry(nil)
 }
 
-// 当链码执行完成后发出通知
 func (h *Handler) Notify(msg *pb.ChaincodeMessage) {
 	tctx := h.TXContexts.Get(msg.ChannelId, msg.Txid)
 	if tctx == nil {
@@ -568,7 +548,6 @@ func (h *Handler) Notify(msg *pb.ChaincodeMessage) {
 		return
 	}
 
-	// 将链码执行完成的消息写入响应提醒通道
 	chaincodeLogger.Debugf("[%s] notifying Txid:%s, channelID:%s", shorttxid(msg.Txid), msg.Txid, msg.ChannelId)
 	tctx.ResponseNotifier <- msg
 	tctx.CloseQueryIterators()
@@ -637,7 +616,7 @@ func hasReadAccess(chaincodeName, collection string, txContext *TransactionConte
 		Collection: collection,
 	}
 
-	accessAllowed, err := txContext.CollectionStore.HasReadAccess(cc, txContext.SignedProp.SignedProposal[0], txContext.TXSimulator)
+	accessAllowed, err := txContext.CollectionStore.HasReadAccess(cc, txContext.SignedProp, txContext.TXSimulator)
 	if err != nil {
 		return false, err
 	}
@@ -1171,7 +1150,7 @@ func (h *Handler) HandleInvokeChaincode(msg *pb.ChaincodeMessage, txContext *Tra
 	}
 	chaincodeLogger.Debugf("[%s] C-call-C %s on channel %s", shorttxid(msg.Txid), targetInstance.ChaincodeName, targetInstance.ChainID)
 
-	err = h.checkACL(txContext.SignedProp.SignedProposal[0], txContext.Proposal[0], targetInstance)
+	err = h.checkACL(txContext.SignedProp, txContext.Proposal, targetInstance)
 	if err != nil {
 		chaincodeLogger.Errorf(
 			"[%s] C-call-C %s on channel %s failed check ACL [%v]: [%s]",
@@ -1189,7 +1168,7 @@ func (h *Handler) HandleInvokeChaincode(msg *pb.ChaincodeMessage, txContext *Tra
 	txParams := &ccprovider.TransactionParams{
 		TxID:                 msg.Txid,
 		ChannelID:            targetInstance.ChainID,
-		SignedProps:          txContext.SignedProp,
+		SignedProp:           txContext.SignedProp,
 		Proposal:             txContext.Proposal,
 		TXSimulator:          txContext.TXSimulator,
 		HistoryQueryExecutor: txContext.HistoryQueryExecutor,
@@ -1258,12 +1237,10 @@ func (h *Handler) HandleInvokeChaincode(msg *pb.ChaincodeMessage, txContext *Tra
 	return &pb.ChaincodeMessage{Type: pb.ChaincodeMessage_RESPONSE, Payload: res, Txid: msg.Txid, ChannelId: msg.ChannelId}, nil
 }
 
-// 链码执行
 func (h *Handler) Execute(txParams *ccprovider.TransactionParams, cccid *ccprovider.CCContext, msg *pb.ChaincodeMessage, timeout time.Duration) (*pb.ChaincodeMessage, error) {
 	chaincodeLogger.Debugf("Entry")
 	defer chaincodeLogger.Debugf("Exit")
 
-	//startTime := time.Now()
 	txParams.CollectionStore = h.getCollectionStore(msg.ChannelId)
 	txParams.IsInitTransaction = (msg.Type == pb.ChaincodeMessage_INIT)
 
@@ -1272,45 +1249,25 @@ func (h *Handler) Execute(txParams *ccprovider.TransactionParams, cccid *ccprovi
 		return nil, err
 	}
 	defer h.TXContexts.Delete(msg.ChannelId, msg.Txid)
-	if txParams.SignedProps != nil && txParams.Proposal != nil {
-		if h.Flag == "8052" {
-			if err := h.setChaincodeProposal(txParams.SignedProps.SignedProposal[1], txParams.Proposal[1], msg); err != nil {
-				return nil, err
-			}
-		} else {
-			if err := h.setChaincodeProposal(txParams.SignedProps.SignedProposal[0], txParams.Proposal[0], msg); err != nil {
-				return nil, err
-			}
-		}
-	} else {
-		if err := h.setChaincodeProposal(nil, nil, msg); err != nil {
-			return nil, err
-		}
+
+	if err := h.setChaincodeProposal(txParams.SignedProp, txParams.Proposal, msg); err != nil {
+		return nil, err
 	}
 
-	//chaincodeLogger.Errorf("链码执行 发送执行请求前准备耗时 %dμs", time.Since(startTime).Microseconds())
-
-	//startTime = time.Now()
-	// 向链码容器发送消息
 	h.serialSendAsync(msg)
 
-	// 等待链码容器返回结果
 	var ccresp *pb.ChaincodeMessage
 	select {
 	case ccresp = <-txctx.ResponseNotifier:
-		// 获取执行完成的信号
 		// response is sent to user or calling chaincode. ChaincodeMessage_ERROR
 		// are typically treated as error
 	case <-time.After(timeout):
-		// 链码执行超时
 		err = errors.New("timeout expired while executing transaction")
 		ccName := cccid.Name + ":" + cccid.Version
 		h.Metrics.ExecuteTimeouts.With("chaincode", ccName).Add(1)
 	case <-h.streamDone():
-		// 链码数据流中断
 		err = errors.New("chaincode stream terminated")
 	}
-	//chaincodeLogger.Errorf("链码执行 发送执行请求耗时 %dμs", time.Since(startTime).Microseconds())
 
 	return ccresp, err
 }
@@ -1322,7 +1279,6 @@ func (h *Handler) setChaincodeProposal(signedProp *pb.SignedProposal, prop *pb.P
 	// TODO: This doesn't make a lot of sense. Feels like both are required or
 	// neither should be set. Check with a knowledgeable expert.
 	if prop != nil {
-		// TODO 这个地方加进去之后和不加好像对后续的操作没什么影响，以后发现问题的时候可以验证一下这里？？？
 		msg.Proposal = signedProp
 	}
 	return nil

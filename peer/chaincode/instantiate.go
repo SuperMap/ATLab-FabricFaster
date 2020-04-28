@@ -75,20 +75,18 @@ func instantiate(cmd *cobra.Command, cf *ChaincodeCmdFactory) (*protcommon.Envel
 		return nil, fmt.Errorf("error creating proposal  %s: %s", chainFuncName, err)
 	}
 
-	var signedProp0 *pb.SignedProposal
-	signedProp0, err = utils.GetSignedProposal(prop, cf.Signer)
+	var signedProp *pb.SignedProposal
+	signedProp, err = utils.GetSignedProposal(prop, cf.Signer)
 	if err != nil {
 		return nil, fmt.Errorf("error creating signed proposal  %s: %s", chainFuncName, err)
 	}
 
-	signedProp := &pb.SignedProposals{SignedProposal: []*pb.SignedProposal{signedProp0}}
 	// instantiate is currently only supported for one peer
-	proposalResponses, err := cf.EndorserClients[0].ProcessProposal(context.Background(), signedProp)
+	proposalResponse, err := cf.EndorserClients[0].ProcessProposal(context.Background(), signedProp)
 	if err != nil {
 		return nil, fmt.Errorf("error endorsing %s: %s", chainFuncName, err)
 	}
 
-	proposalResponse := proposalResponses.ProposalResponse[0]
 	if proposalResponse != nil {
 		// assemble a signed transaction (it's an Envelope message)
 		env, err := utils.CreateSignedTx(prop, cf.Signer, proposalResponse)

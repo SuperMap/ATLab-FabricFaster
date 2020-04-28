@@ -85,20 +85,18 @@ func getChaincodes(cmd *cobra.Command, cf *ChaincodeCmdFactory) error {
 		return fmt.Errorf("Error creating proposal %s: %s", chainFuncName, err)
 	}
 
-	var signedProp0 *pb.SignedProposal
-	signedProp0, err = utils.GetSignedProposal(prop, cf.Signer)
+	var signedProp *pb.SignedProposal
+	signedProp, err = utils.GetSignedProposal(prop, cf.Signer)
 	if err != nil {
 		return fmt.Errorf("Error creating signed proposal  %s: %s", chainFuncName, err)
 	}
 
-	signedProp := &pb.SignedProposals{SignedProposal: []*pb.SignedProposal{signedProp0}}
 	// list is currently only supported for one peer
-	proposalResponses, err := cf.EndorserClients[0].ProcessProposal(context.Background(), signedProp)
+	proposalResponse, err := cf.EndorserClients[0].ProcessProposal(context.Background(), signedProp)
 	if err != nil {
 		return errors.Errorf("Error endorsing %s: %s", chainFuncName, err)
 	}
 
-	proposalResponse := proposalResponses.ProposalResponse[0]
 	if proposalResponse.Response == nil {
 		return errors.Errorf("Proposal response had nil 'response'")
 	}

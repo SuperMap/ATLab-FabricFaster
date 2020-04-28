@@ -58,7 +58,6 @@ type ChaincodeSupport struct {
 	appConfig        ApplicationConfigRetriever
 	HandlerMetrics   *HandlerMetrics
 	LaunchMetrics    *LaunchMetrics
-	CCContainerName  string
 }
 
 // NewChaincodeSupport creates a new ChaincodeSupport instance.
@@ -76,7 +75,6 @@ func NewChaincodeSupport(
 	platformRegistry *platforms.Registry,
 	appConfig ApplicationConfigRetriever,
 	metricsProvider metrics.Provider,
-	ccname string,
 ) *ChaincodeSupport {
 	cs := &ChaincodeSupport{
 		UserRunsCC:       userRunsCC,
@@ -89,7 +87,6 @@ func NewChaincodeSupport(
 		appConfig:        appConfig,
 		HandlerMetrics:   NewHandlerMetrics(metricsProvider),
 		LaunchMetrics:    NewLaunchMetrics(metricsProvider),
-		CCContainerName:  ccname,
 	}
 
 	// Keep TestQueries working
@@ -136,22 +133,15 @@ func (cs *ChaincodeSupport) LaunchInit(ccci *ccprovider.ChaincodeContainerInfo) 
 // Launch starts executing chaincode if it is not already running. This method
 // blocks until the peer side handler gets into ready state or encounters a fatal
 // error. If the chaincode is already running, it simply returns.
-// 启动链码容器
 func (cs *ChaincodeSupport) Launch(chainID, chaincodeName, chaincodeVersion string, qe ledger.QueryExecutor) (*Handler, error) {
 	cname := chaincodeName + ":" + chaincodeVersion
-	// 检查该链码容器是否已经注册，如果已注册则直接返回handler
-	// handler中含有与该容器绑定的gRPC通信流
 	if h := cs.HandlerRegistry.Handler(cname); h != nil {
 		return h, nil
 	}
 
-	// 获取链码容器信息，链码名、版本、语言、路径、容器类型等
 	ccci, err := cs.Lifecycle.ChaincodeContainerInfo(chaincodeName, qe)
-	ccci.Flag = cs.CCContainerName // 将端口号存入标记位
-
 	if err != nil {
 		// TODO: There has to be a better way to do this...
-		// 正在使用开发者模式或链码尚未部署
 		if cs.UserRunsCC {
 			chaincodeLogger.Error(
 				"You are attempting to perform an action other than Deploy on Chaincode that is not ready and you are in developer mode. Did you forget to Deploy your chaincode?",
@@ -179,7 +169,6 @@ func (cs *ChaincodeSupport) Stop(ccci *ccprovider.ChaincodeContainerInfo) error 
 }
 
 // HandleChaincodeStream implements ccintf.HandleChaincodeStream for all vms to call with appropriate stream
-// 处理链码流
 func (cs *ChaincodeSupport) HandleChaincodeStream(stream ccintf.ChaincodeStream) error {
 	handler := &Handler{
 		Invoker:                    cs,
@@ -197,14 +186,12 @@ func (cs *ChaincodeSupport) HandleChaincodeStream(stream ccintf.ChaincodeStream)
 		LedgerGetter:               peer.Default,
 		AppConfig:                  cs.appConfig,
 		Metrics:                    cs.HandlerMetrics,
-		Flag:                       cs.CCContainerName,
 	}
 
 	return handler.ProcessStream(stream)
 }
 
 // Register the bidi stream entry point called by chaincode to register with the Peer.
-// 将调用链码的双向流入口注册到Peer
 func (cs *ChaincodeSupport) Register(stream pb.ChaincodeSupport_RegisterServer) error {
 	return cs.HandleChaincodeStream(stream)
 }
@@ -248,13 +235,11 @@ func (cs *ChaincodeSupport) ExecuteLegacyInit(txParams *ccprovider.TransactionPa
 }
 
 // Execute invokes chaincode and returns the original response.
-// 执行调用链码并返回原始响应
 func (cs *ChaincodeSupport) Execute(txParams *ccprovider.TransactionParams, cccid *ccprovider.CCContext, input *pb.ChaincodeInput) (*pb.Response, *pb.ChaincodeEvent, error) {
 	resp, err := cs.Invoke(txParams, cccid, input)
 	return processChaincodeExecutionResult(txParams.TxID, cccid.Name, resp, err)
 }
 
-// 处理背书节点返回的执行结果
 func processChaincodeExecutionResult(txid, ccName string, resp *pb.ChaincodeMessage, err error) (*pb.Response, *pb.ChaincodeEvent, error) {
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "failed to execute transaction %s", txid)
@@ -296,16 +281,11 @@ func (cs *ChaincodeSupport) InvokeInit(txParams *ccprovider.TransactionParams, c
 
 // Invoke will invoke chaincode and return the message containing the response.
 // The chaincode will be launched if it is not already running.
-// 调用链码
 func (cs *ChaincodeSupport) Invoke(txParams *ccprovider.TransactionParams, cccid *ccprovider.CCContext, input *pb.ChaincodeInput) (*pb.ChaincodeMessage, error) {
-	//startTime := time.Now()
-	// 启动链码容器
 	h, err := cs.Launch(txParams.ChannelID, cccid.Name, cccid.Version, txParams.TXSimulator)
 	if err != nil {
 		return nil, err
 	}
-
-	//chaincodeLogger.Errorf("启动链码容器耗时 %dμs：", time.Since(startTime).Microseconds())
 
 	// TODO add Init exactly once semantics here once new lifecycle
 	// is available.  Enforced if the target channel is using the new lifecycle
@@ -319,15 +299,12 @@ func (cs *ChaincodeSupport) Invoke(txParams *ccprovider.TransactionParams, cccid
 	// otherwise, only allow cctype pb.ChaincodeMessage_INIT,
 	cctype := pb.ChaincodeMessage_TRANSACTION
 
-	// 执行链码
 	return cs.execute(cctype, txParams, cccid, input, h)
 }
 
 // execute executes a transaction and waits for it to complete until a timeout value.
 func (cs *ChaincodeSupport) execute(cctyp pb.ChaincodeMessage_Type, txParams *ccprovider.TransactionParams, cccid *ccprovider.CCContext, input *pb.ChaincodeInput, h *Handler) (*pb.ChaincodeMessage, error) {
-	//startTime := time.Now()
 	input.Decorations = txParams.ProposalDecorations
-	// 解码proto并构造链码信息
 	ccMsg, err := createCCMessage(cctyp, txParams.ChannelID, txParams.TxID, input)
 	if err != nil {
 		return nil, errors.WithMessage(err, "failed to create chaincode message")
@@ -337,7 +314,6 @@ func (cs *ChaincodeSupport) execute(cctyp pb.ChaincodeMessage_Type, txParams *cc
 	if err != nil {
 		return nil, errors.WithMessage(err, fmt.Sprintf("error sending"))
 	}
-	//chaincodeLogger.Errorf("调用执行链码 execte() 耗时 %dμs", time.Since(startTime).Microseconds())
 
 	return ccresp, nil
 }

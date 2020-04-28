@@ -33,7 +33,7 @@ type SupportImpl struct {
 	crypto.SignerSupport
 	Peer             peer.Operations
 	PeerSupport      peer.Support
-	ChaincodeSupport []*chaincode.ChaincodeSupport
+	ChaincodeSupport *chaincode.ChaincodeSupport
 	SysCCProvider    *scc.Provider
 	ACLProvider      aclmgmt.ACLProvider
 }
@@ -79,12 +79,10 @@ func (s *SupportImpl) GetHistoryQueryExecutor(ledgername string) (ledger.History
 
 // GetTransactionByID retrieves a transaction by id
 func (s *SupportImpl) GetTransactionByID(chid, txID string) (*pb.ProcessedTransaction, error) {
-	// 根据chid，获取对应通道的账本管理器
 	lgr := s.Peer.GetLedger(chid)
 	if lgr == nil {
 		return nil, errors.Errorf("failed to look up the ledger for Channel %s", chid)
 	}
-	// 在区块文件中查找交易txID，并获取交易状态码（是否有效）
 	tx, err := lgr.GetTransactionByID(txID)
 	if err != nil {
 		return nil, errors.WithMessage(err, "GetTransactionByID failed")
@@ -129,80 +127,29 @@ func (s *SupportImpl) ExecuteLegacyInit(txParams *ccprovider.TransactionParams, 
 		Name:    name,
 		Version: version,
 	}
-	support := s.ChaincodeSupport[0]
-	return support.ExecuteLegacyInit(txParams, cccid, cds)
+
+	return s.ChaincodeSupport.ExecuteLegacyInit(txParams, cccid, cds)
 }
 
 // Execute a proposal and return the chaincode response
-//　执行提案并返回链码响应
-func (s *SupportImpl) Execute(txParams *ccprovider.TransactionParams, cid, name, version, txid string, signedProp *pb.SignedProposals, props []*pb.Proposal, inputs []*pb.ChaincodeInput) ([]*pb.Response, []*pb.ChaincodeEvent, error) {
-	var resps = *new([]*pb.Response)
-	var ccEvents = *new([]*pb.ChaincodeEvent)
-	var err error
+func (s *SupportImpl) Execute(txParams *ccprovider.TransactionParams, cid, name, version, txid string, signedProp *pb.SignedProposal, prop *pb.Proposal, input *pb.ChaincodeInput) (*pb.Response, *pb.ChaincodeEvent, error) {
+	cccid := &ccprovider.CCContext{
+		Name:    name,
+		Version: version,
+	}
 
 	// decorate the chaincode input
-	// 单例装饰器
 	decorators := library.InitRegistry(library.Config{}).Lookup(library.Decoration).([]decoration.Decorator)
+	input.Decorations = make(map[string][]byte)
+	input = decoration.Apply(prop, input, decorators...)
+	txParams.ProposalDecorations = input.Decorations
 
-	for i, _ := range inputs {
-		input := inputs[i]
-		input.Decorations = make(map[string][]byte) // 目前还没有添加任何修饰
-		input = decoration.Apply(props[i], input, decorators...)
-		txParams.ProposalDecorations = input.Decorations
-		inputs[i] = input // 将装饰后的input重新放入inputs
-	}
-
-	cRes := make(chan *pb.Response, 2)
-	cCCEvt := make(chan *pb.ChaincodeEvent, 2)
-	cErr := make(chan error, 2)
-
-	// 并行执行交易
-	for i, _ := range inputs {
-		// 此support必须每次循环时创建一个示例，不能在循环时获取for中的value值，因为在for中每次都是为同一个对象赋值
-		support := s.ChaincodeSupport[i]
-
-		go func(index int, s *chaincode.ChaincodeSupport) {
-			// 创建链码上下文对象
-			cccid := &ccprovider.CCContext{
-				Name:    name,
-				Version: version + "-" + s.CCContainerName,
-			}
-			response, event, err := s.Execute(txParams, cccid, inputs[index])
-			cCCEvt <- event
-			cErr <- err
-			cRes <- response
-		}(i, support)
-	}
-
-EXIT:
-	for {
-		select {
-		case err = <-cErr:
-			res := <-cRes
-			evt := <-cCCEvt
-			resps = append(resps, res)
-			ccEvents = append(ccEvents, evt)
-			if len(resps) >= len(s.ChaincodeSupport) {
-				break EXIT
-			}
-			if err != nil {
-				resps[0] = res
-				ccEvents[0] = evt
-			}
-		}
-	}
-
-	//for i := 1; i < cap(cRes); i++ {
-	//	resps = append(resps, <- cRes)
-	//	ccEvents = append(ccEvents, <- cCCEvt)
-	//}
-	return resps, ccEvents, err
+	return s.ChaincodeSupport.Execute(txParams, cccid, input)
 }
 
 // GetChaincodeDefinition returns ccprovider.ChaincodeDefinition for the chaincode with the supplied name
 func (s *SupportImpl) GetChaincodeDefinition(chaincodeName string, txsim ledger.QueryExecutor) (ccprovider.ChaincodeDefinition, error) {
-	support := s.ChaincodeSupport[0]
-	return support.Lifecycle.ChaincodeDefinition(chaincodeName, txsim)
+	return s.ChaincodeSupport.Lifecycle.ChaincodeDefinition(chaincodeName, txsim)
 }
 
 // CheckACL checks the ACL for the resource for the Channel using the

@@ -237,7 +237,6 @@ func (vm *DockerVM) Start(ccid ccintf.CCID, args, env []string, filesToUpload ma
 
 	attachStdout := viper.GetBool("vm.docker.attachStdout")
 	containerName := vm.GetVMName(ccid)
-
 	logger := dockerLogger.With("imageName", imageName, "containerName", containerName)
 
 	client, err := vm.getClientFnc()
@@ -248,22 +247,18 @@ func (vm *DockerVM) Start(ccid ccintf.CCID, args, env []string, filesToUpload ma
 
 	vm.stopInternal(client, containerName, 0, false, false)
 
-	// 创建容器
 	err = vm.createContainer(client, imageName, containerName, args, env, attachStdout)
 	if err == docker.ErrNoSuchImage {
-		// 根据链码语言，使用不用的链码编译镜像（fabric-ccenv）将链码编译为可执行程序并打包为tar包，放入io流中
 		reader, err := builder.Build()
 		if err != nil {
 			return errors.Wrapf(err, "failed to generate Dockerfile to build %s", containerName)
 		}
 
-		// 将链码二进制tar包加入（fabric-baseos）基础运行镜像，制作链码镜像
 		err = vm.deployImage(client, ccid, reader)
 		if err != nil {
 			return err
 		}
 
-		// 创建链码容器
 		err = vm.createContainer(client, imageName, containerName, args, env, attachStdout)
 		if err != nil {
 			logger.Errorf("failed to create container: %s", err)
@@ -275,7 +270,6 @@ func (vm *DockerVM) Start(ccid ccintf.CCID, args, env []string, filesToUpload ma
 	}
 
 	// stream stdout and stderr to chaincode logger
-	// 将链码日志输出到终端，该设置默认在core.yaml为false
 	if attachStdout {
 		containerLogger := flogging.MustGetLogger("peer.chaincode." + containerName)
 		streamOutput(dockerLogger, client, containerName, containerLogger)

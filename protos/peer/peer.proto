@@ -33,5 +33,5 @@ message PeerEndpoint {
 }
 
 service Endorser {
-	rpc ProcessProposal(SignedProposals) returns (ProposalResponses) {}
+	rpc ProcessProposal(SignedProposal) returns (ProposalResponse) {}
 }

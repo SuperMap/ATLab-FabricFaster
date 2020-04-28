@@ -105,21 +105,18 @@ func executeJoin(cf *ChannelCmdFactory) (err error) {
 		return fmt.Errorf("Error creating proposal for join %s", err)
 	}
 
-	var signedProp0 *pb.SignedProposal
-	signedProp0, err = putils.GetSignedProposal(prop, cf.Signer)
+	var signedProp *pb.SignedProposal
+	signedProp, err = putils.GetSignedProposal(prop, cf.Signer)
 	if err != nil {
 		return fmt.Errorf("Error creating signed proposal %s", err)
 	}
 
-	signedProp := &pb.SignedProposals{SignedProposal: []*pb.SignedProposal{signedProp0}}
-
-	var proposalResps *pb.ProposalResponses
-	proposalResps, err = cf.EndorserClient.ProcessProposal(context.Background(), signedProp)
+	var proposalResp *pb.ProposalResponse
+	proposalResp, err = cf.EndorserClient.ProcessProposal(context.Background(), signedProp)
 	if err != nil {
 		return ProposalFailedErr(err.Error())
 	}
 
-	proposalResp := proposalResps.ProposalResponse[0]
 	if proposalResp == nil {
 		return ProposalFailedErr("nil proposal response")
 	}

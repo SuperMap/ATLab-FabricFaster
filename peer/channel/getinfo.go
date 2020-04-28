@@ -55,20 +55,17 @@ func (cc *endorserClient) getBlockChainInfo() (*cb.BlockchainInfo, error) {
 		return nil, errors.WithMessage(err, "cannot create proposal")
 	}
 
-	var signedProp0 *pb.SignedProposal
-	signedProp0, err = utils.GetSignedProposal(prop, cc.cf.Signer)
+	var signedProp *pb.SignedProposal
+	signedProp, err = utils.GetSignedProposal(prop, cc.cf.Signer)
 	if err != nil {
 		return nil, errors.WithMessage(err, "cannot create signed proposal")
 	}
 
-	signedProp := &pb.SignedProposals{SignedProposal: []*pb.SignedProposal{signedProp0}}
-
-	proposalResp0, err := cc.cf.EndorserClient.ProcessProposal(context.Background(), signedProp)
+	proposalResp, err := cc.cf.EndorserClient.ProcessProposal(context.Background(), signedProp)
 	if err != nil {
 		return nil, errors.WithMessage(err, "failed sending proposal")
 	}
 
-	proposalResp := proposalResp0.ProposalResponse[0]
 	if proposalResp.Response == nil || proposalResp.Response.Status != 200 {
 		return nil, errors.Errorf("received bad response, status %d: %s", proposalResp.Response.Status, proposalResp.Response.Message)
 	}

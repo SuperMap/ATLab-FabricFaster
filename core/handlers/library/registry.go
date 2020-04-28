@@ -77,9 +77,7 @@ type HandlerConfig struct {
 
 // InitRegistry creates the (only) instance
 // of the registry
-// 初始注册，注册core.yaml中（“peer.handlers”）定义的过滤器
 func InitRegistry(c Config) Registry {
-	// 单例模式，只执行一次
 	once.Do(func() {
 		reg = registry{
 			endorsers:  make(map[string]endorsement2.PluginFactory),
@@ -119,7 +117,6 @@ func (r *registry) evaluateModeAndLoad(c *HandlerConfig, handlerType HandlerType
 
 // loadCompiled loads a statically compiled handler
 func (r *registry) loadCompiled(handlerFactory string, handlerType HandlerType, extraArgs ...string) {
-	// 通过反射获取对应的方法
 	registryMD := reflect.ValueOf(&HandlerLibrary{})
 
 	o := registryMD.MethodByName(handlerFactory)

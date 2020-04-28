@@ -386,9 +386,6 @@ type CCContext struct {
 
 	// Version used to construct the chaincode image and register
 	Version string
-
-	// 标识一笔交易中使用不同端口号的链码
-	Flag string
 }
 
 // GetCanonicalName returns the canonical name associated with the proposal context
@@ -493,14 +490,12 @@ func (cd *ChaincodeData) String() string { return proto.CompactTextString(cd) }
 func (*ChaincodeData) ProtoMessage() {}
 
 // ChaincodeContainerInfo is yet another synonym for the data required to start/stop a chaincode.
-// 增加Flag用于识别同一个链码的多个容器
 type ChaincodeContainerInfo struct {
 	Name        string
 	Version     string
 	Path        string
 	Type        string
 	CodePackage []byte
-	Flag        string
 
 	// ContainerType is not a great name, but 'DOCKER' and 'SYSTEM' are the valid types
 	ContainerType string
@@ -511,8 +506,8 @@ type ChaincodeContainerInfo struct {
 type TransactionParams struct {
 	TxID                 string
 	ChannelID            string
-	SignedProps          *pb.SignedProposals
-	Proposal             []*pb.Proposal
+	SignedProp           *pb.SignedProposal
+	Proposal             *pb.Proposal
 	TXSimulator          ledger.TxSimulator
 	HistoryQueryExecutor ledger.HistoryQueryExecutor
 	CollectionStore      privdata.CollectionStore
