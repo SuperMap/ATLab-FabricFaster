@@ -23,6 +23,7 @@ import (
 	"github.com/hyperledger/fabric/core/ledger/util"
 	"github.com/hyperledger/fabric/protos/ledger/rwset"
 	"github.com/hyperledger/fabric/protos/ledger/rwset/kvrwset"
+	"sync"
 )
 
 var logger = flogging.MustGetLogger("rwsetutil")
@@ -31,6 +32,7 @@ var logger = flogging.MustGetLogger("rwsetutil")
 type RWSetBuilder struct {
 	pubRwBuilderMap map[string]*nsPubRwBuilder
 	pvtRwBuilderMap map[string]*nsPvtRwBuilder
+	Lock            sync.Mutex
 }
 
 type nsPubRwBuilder struct {
@@ -70,7 +72,7 @@ type rangeQueryKey struct {
 
 // NewRWSetBuilder constructs a new instance of RWSetBuilder
 func NewRWSetBuilder() *RWSetBuilder {
-	return &RWSetBuilder{make(map[string]*nsPubRwBuilder), make(map[string]*nsPvtRwBuilder)}
+	return &RWSetBuilder{make(map[string]*nsPubRwBuilder), make(map[string]*nsPvtRwBuilder), sync.Mutex{}}
 }
 
 // AddToReadSet adds a key and corresponding version to the read-set
@@ -271,6 +273,8 @@ func (b *collPvtRwBuilder) build() *CollPvtRwSet {
 }
 
 func (b *RWSetBuilder) getOrCreateNsPubRwBuilder(ns string) *nsPubRwBuilder {
+	b.Lock.Lock()
+	defer b.Lock.Unlock()
 	nsPubRwBuilder, ok := b.pubRwBuilderMap[ns]
 	if !ok {
 		nsPubRwBuilder = newNsPubRwBuilder(ns)
