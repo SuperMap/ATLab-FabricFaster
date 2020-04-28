@@ -346,9 +346,14 @@ func (e *Endorser) endorseProposal(_ context.Context, chainID string, txid strin
 
 // preProcess checks the tx proposal headers, uniqueness and ACL
 func (e *Endorser) preProcess(signedProp *pb.SignedProposal) (*validateResult, error) {
+	startTime_p1 := time.Now()
+
 	vr := &validateResult{}
 	// at first, we check whether the message is valid
 	prop, hdr, hdrExt, err := validation.ValidateProposalMessage(signedProp)
+
+	endorserLogger.Errorf("背书阶段 preProcess()_p1 验证耗时 %d μs", time.Since(startTime_p1).Microseconds())
+	startTime_p1 = time.Now()
 
 	if err != nil {
 		e.Metrics.ProposalValidationFailed.Add(1)
@@ -368,6 +373,9 @@ func (e *Endorser) preProcess(signedProp *pb.SignedProposal) (*validateResult, e
 		return vr, err
 	}
 
+	endorserLogger.Errorf("背书阶段 preProcess()_p2 验证耗时 %d μs", time.Since(startTime_p1).Microseconds())
+	startTime_p1 = time.Now()
+
 	// block invocations to security-sensitive system chaincodes
 	if e.s.IsSysCCAndNotInvokableExternal(hdrExt.ChaincodeId.Name) {
 		endorserLogger.Errorf("Error: an attempt was made by %#v to invoke system chaincode %s", shdr.Creator, hdrExt.ChaincodeId.Name)
@@ -375,6 +383,9 @@ func (e *Endorser) preProcess(signedProp *pb.SignedProposal) (*validateResult, e
 		vr.resp = &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}
 		return vr, err
 	}
+
+	endorserLogger.Errorf("背书阶段 preProcess()_p3 验证耗时 %d μs", time.Since(startTime_p1).Microseconds())
+	startTime_p1 = time.Now()
 
 	chainID := chdr.ChannelId
 	txid := chdr.TxId
@@ -398,6 +409,9 @@ func (e *Endorser) preProcess(signedProp *pb.SignedProposal) (*validateResult, e
 			return vr, err
 		}
 
+		endorserLogger.Errorf("背书阶段 preProcess()_p4 验证耗时 %d μs", time.Since(startTime_p1).Microseconds())
+		startTime_p1 = time.Now()
+
 		// check ACL only for application chaincodes; ACLs
 		// for system chaincodes are checked elsewhere
 		if !e.s.IsSysCC(hdrExt.ChaincodeId.Name) {
@@ -407,6 +421,7 @@ func (e *Endorser) preProcess(signedProp *pb.SignedProposal) (*validateResult, e
 				vr.resp = &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}
 				return vr, err
 			}
+			endorserLogger.Errorf("背书阶段 preProcess()_p5 验证耗时 %d μs", time.Since(startTime_p1).Microseconds())
 		}
 	} else {
 		// chainless proposals do not/cannot affect ledger and cannot be submitted as transactions
