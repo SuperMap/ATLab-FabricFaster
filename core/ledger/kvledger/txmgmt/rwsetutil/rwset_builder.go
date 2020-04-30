@@ -43,6 +43,7 @@ type nsPubRwBuilder struct {
 	rangeQueriesMap   map[rangeQueryKey]*kvrwset.RangeQueryInfo //for phantom read validation
 	rangeQueriesKeys  []rangeQueryKey
 	collHashRwBuilder map[string]*collHashRwBuilder
+	Lock              sync.Mutex
 }
 
 type collHashRwBuilder struct {
@@ -78,12 +79,16 @@ func NewRWSetBuilder() *RWSetBuilder {
 // AddToReadSet adds a key and corresponding version to the read-set
 func (b *RWSetBuilder) AddToReadSet(ns string, key string, version *version.Height) {
 	nsPubRwBuilder := b.getOrCreateNsPubRwBuilder(ns)
+	nsPubRwBuilder.Lock.Lock()
+	defer nsPubRwBuilder.Lock.Unlock()
 	nsPubRwBuilder.readMap[key] = NewKVRead(key, version)
 }
 
 // AddToWriteSet adds a key and value to the write-set
 func (b *RWSetBuilder) AddToWriteSet(ns string, key string, value []byte) {
 	nsPubRwBuilder := b.getOrCreateNsPubRwBuilder(ns)
+	nsPubRwBuilder.Lock.Lock()
+	defer nsPubRwBuilder.Lock.Unlock()
 	nsPubRwBuilder.writeMap[key] = newKVWrite(key, value)
 }
 
@@ -321,6 +326,7 @@ func newNsPubRwBuilder(namespace string) *nsPubRwBuilder {
 		make(map[rangeQueryKey]*kvrwset.RangeQueryInfo),
 		nil,
 		make(map[string]*collHashRwBuilder),
+		sync.Mutex{},
 	}
 }
 
