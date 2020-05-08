@@ -305,6 +305,10 @@ func (cs *ChaincodeSupport) Invoke(txParams *ccprovider.TransactionParams, cccid
 		return nil, err
 	}
 
+	if string(input.Args[0]) == "GetConfigBlock" {
+		h.Flag = "7052"
+	}
+
 	//chaincodeLogger.Errorf("启动链码容器耗时 %dμs：", time.Since(startTime).Microseconds())
 
 	// TODO add Init exactly once semantics here once new lifecycle

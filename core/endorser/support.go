@@ -160,12 +160,19 @@ func (s *SupportImpl) Execute(txParams *ccprovider.TransactionParams, cid, name,
 	for i, _ := range inputs {
 		// 此support必须每次循环时创建一个示例，不能在循环时获取for中的value值，因为在for中每次都是为同一个对象赋值
 		support := s.ChaincodeSupport[i]
+		if string(inputs[i].Args[0]) == "GetConfigBlock" {
+			support = s.ChaincodeSupport[1]
+		}
 
 		go func(index int, s *chaincode.ChaincodeSupport) {
+			version2 := version
+			if (name != "cscc") && (name != "lscc") {
+				version2 = version + "-" + s.CCContainerName
+			}
 			// 创建链码上下文对象
 			cccid := &ccprovider.CCContext{
 				Name:    name,
-				Version: version + "-" + s.CCContainerName,
+				Version: version2,
 			}
 			response, event, err := s.Execute(txParams, cccid, inputs[index])
 			cCCEvt <- event

@@ -117,6 +117,9 @@ func (r *HandlerRegistry) Failed(cname string, err error) {
 func (r *HandlerRegistry) Handler(cname string) *Handler {
 	r.mutex.Lock()
 	h := r.handlers[cname]
+	for _, v := range r.handlers {
+		println(v.chaincodeID.Name + v.chaincodeID.Version)
+	}
 	r.mutex.Unlock()
 	return h
 }

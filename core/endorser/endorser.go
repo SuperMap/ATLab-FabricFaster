@@ -151,6 +151,9 @@ func (e *Endorser) callChaincode(txParams *ccprovider.TransactionParams, version
 		return nil, nil, err
 	}
 
+	if responses[0] == nil {
+		responses[0] = responses[1]
+	}
 	// per doc anything < 400 can be sent as TX.
 	// fabric errors will always be >= 400 (ie, unambiguous errors )
 	// "lscc" will respond with status 200 or 500 (ie, unambiguous OK or ERROR)
@@ -236,6 +239,10 @@ func (e *Endorser) SimulateProposal(txParams *ccprovider.TransactionParams, cid 
 		}
 
 		inputs = append(inputs, cis.ChaincodeSpec.Input)
+	}
+
+	if len(inputs) == 1 {
+		inputs = append(inputs, inputs[0])
 	}
 
 	var cdLedger ccprovider.ChaincodeDefinition
@@ -511,6 +518,10 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProps *pb.SignedPr
 	}()
 
 	// 0 -- check and validate
+	if len(signedProps.SignedProposal) == 1 {
+		signedProps.SignedProposal = append(signedProps.SignedProposal, signedProps.SignedProposal[0])
+
+	}
 	var vr *validateResult
 	for i, signedProp := range signedProps.SignedProposal {
 		/**
@@ -533,6 +544,9 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProps *pb.SignedPr
 			return nil, err
 		}
 		props = append(props, vr0.prop)
+	}
+	if len(props) == 1 {
+		props = append(props, props[0])
 	}
 
 	hdrExt, chainID, txid := vr.hdrExt, vr.chainID, vr.txid

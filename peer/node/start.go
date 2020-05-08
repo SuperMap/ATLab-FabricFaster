@@ -359,6 +359,7 @@ func serve(args []string) error {
 	// initialize system chaincodes
 
 	// deploy system chaincodes
+	// 这里只为最后一个创建的ChaincodeSupport添加了HandlerRegistry.handlers。因为后创建的覆盖率先创建的。
 	sccp.DeploySysCCs("", ccp)
 	logger.Infof("Deployed system chaincodes")
 
