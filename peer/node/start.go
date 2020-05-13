@@ -275,7 +275,7 @@ func serve(args []string) error {
 	// Initialize chaincode service
 	// 链码服务在背书服务中进行处理，背书服务注册在peer gRPC中，在执行完FilterChain中的所有AuthFilter后执行
 	// 启动链码服务器，即gRPC服务，监听7052端口
-	chaincodeSupports, ccp, sccp, packageProvider := startChaincodeServer(peerHost, aclProvider, pr, opsSystem, "8052")
+	chaincodeSupports, ccp, sccp, packageProvider := startChaincodeServer(peerHost, aclProvider, pr, opsSystem, "8052", "9052", "10052", "10053", "10054", "10055", "10056")
 
 	// 用于PeerServer2的链码支持。链码gRPC使用8052端口
 	//chaincodeSupport2, _, _, _ := startChaincodeServer(peerHost, aclProvider, pr, opsSystem, "8052")
@@ -532,7 +532,7 @@ func registerDiscoveryService(peerServer *comm.GRPCServer, polMgr policies.Chann
 }
 
 //create a CC listener using peer.chaincodeListenAddress (and if that's not set use peer.peerAddress)
-func createChaincodeServer(ca tlsgen.CA, peerHostname string, port ...[]string) (srvs []*comm.GRPCServer, ccEndpoints []string, err error) {
+func createChaincodeServer(ca tlsgen.CA, peerHostname string, ports []string) (srvs []*comm.GRPCServer, ccEndpoints []string, err error) {
 	// 使用可变参，保证原有逻辑不变，当传入端口号时，使用传入的端口
 	var ccEndpoint string
 	var cclistenAddresses []string
@@ -551,8 +551,11 @@ func createChaincodeServer(ca tlsgen.CA, peerHostname string, port ...[]string) 
 		}
 	}
 	ccEndpoints = append(ccEndpoints, ccEndpoint)
-	if port[0] != nil {
-		ccEndpoints = append(ccEndpoints, fmt.Sprintf("%s:%s", peerHostname, port[0][0]))
+
+	if ports != nil {
+		for _, port := range ports {
+			ccEndpoints = append(ccEndpoints, fmt.Sprintf("%s:%s", peerHostname, port))
+		}
 	}
 
 	host, _, err := net.SplitHostPort(ccEndpoint)
@@ -568,8 +571,10 @@ func createChaincodeServer(ca tlsgen.CA, peerHostname string, port ...[]string) 
 	}
 	cclistenAddresses = append(cclistenAddresses, cclistenAddress)
 
-	if port[0] != nil {
-		cclistenAddresses = append(cclistenAddresses, fmt.Sprintf("0.0.0.0:%s", port[0][0]))
+	if ports != nil {
+		for _, port := range ports {
+			cclistenAddresses = append(cclistenAddresses, fmt.Sprintf("0.0.0.0:%s", port))
+		}
 	}
 
 	config, err := peer.GetServerConfig()
@@ -789,7 +794,7 @@ func startChaincodeServer(
 	aclProvider aclmgmt.ACLProvider,
 	pr *platforms.Registry,
 	ops *operations.System,
-	port ...string,
+	ports ...string,
 ) ([]*chaincode.ChaincodeSupport, ccprovider.ChaincodeProvider, *scc.Provider, *persistence.PackageProvider) {
 	// Setup chaincode path
 	chaincodeInstallPath := ccprovider.GetChaincodeInstallPathFromViper()
@@ -819,7 +824,7 @@ func startChaincodeServer(
 	if err != nil {
 		logger.Panic("Failed creating authentication layer:", err)
 	}
-	ccSrvs, ccEndpoints, err := createChaincodeServer(ca, peerHost, port)
+	ccSrvs, ccEndpoints, err := createChaincodeServer(ca, peerHost, ports)
 	if err != nil {
 		logger.Panicf("Failed to create chaincode server: %s", err)
 	}

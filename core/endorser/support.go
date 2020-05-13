@@ -160,8 +160,9 @@ func (s *SupportImpl) Execute(txParams *ccprovider.TransactionParams, cid, name,
 	for i, _ := range inputs {
 		// 此support必须每次循环时创建一个示例，不能在循环时获取for中的value值，因为在for中每次都是为同一个对象赋值
 		support := s.ChaincodeSupport[i]
+		// 获取配置区块的交易必须使用第一个 ChaincodeSupport，因为创建的其他 ChaincodeSupport 功能不完善。
 		if string(inputs[i].Args[0]) == "GetConfigBlock" {
-			support = s.ChaincodeSupport[1]
+			support = s.ChaincodeSupport[len(s.ChaincodeSupport)-1]
 		}
 
 		go func(index int, s *chaincode.ChaincodeSupport) {
@@ -189,7 +190,8 @@ EXIT:
 			evt := <-cCCEvt
 			resps = append(resps, res)
 			ccEvents = append(ccEvents, evt)
-			if len(resps) >= len(s.ChaincodeSupport) {
+			// 当获取的响应多于链码的输入参数时退出
+			if len(resps) >= len(inputs) {
 				break EXIT
 			}
 			if err != nil {
