@@ -9,6 +9,7 @@ package endorser
 import (
 	"context"
 	"fmt"
+	"github.com/spf13/viper"
 	"math/rand"
 	"strconv"
 	"time"
@@ -239,6 +240,11 @@ func (e *Endorser) SimulateProposal(txParams *ccprovider.TransactionParams, cid 
 		}
 
 		inputs = append(inputs, cis.ChaincodeSpec.Input)
+	}
+
+	ports := viper.GetStringSlice("peer.chaincodeContainer")
+	if len(inputs) > len(ports) {
+		return nil, nil, nil, nil, errors.New("请求中交易数大于链码容器数")
 	}
 
 	if len(inputs) == 1 {

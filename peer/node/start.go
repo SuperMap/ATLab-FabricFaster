@@ -275,7 +275,12 @@ func serve(args []string) error {
 	// Initialize chaincode service
 	// 链码服务在背书服务中进行处理，背书服务注册在peer gRPC中，在执行完FilterChain中的所有AuthFilter后执行
 	// 启动链码服务器，即gRPC服务，监听7052端口
-	chaincodeSupports, ccp, sccp, packageProvider := startChaincodeServer(peerHost, aclProvider, pr, opsSystem, "8052", "9052", "10052", "10053", "10054", "10055", "10056")
+
+	// 获取配置文件core.yaml中的链码容器数量
+
+	ports := viper.GetStringSlice("peer.chaincodeContainer")
+
+	chaincodeSupports, ccp, sccp, packageProvider := startChaincodeServer(peerHost, aclProvider, pr, opsSystem, ports)
 
 	// 用于PeerServer2的链码支持。链码gRPC使用8052端口
 	//chaincodeSupport2, _, _, _ := startChaincodeServer(peerHost, aclProvider, pr, opsSystem, "8052")
@@ -794,7 +799,7 @@ func startChaincodeServer(
 	aclProvider aclmgmt.ACLProvider,
 	pr *platforms.Registry,
 	ops *operations.System,
-	ports ...string,
+	ports []string,
 ) ([]*chaincode.ChaincodeSupport, ccprovider.ChaincodeProvider, *scc.Provider, *persistence.PackageProvider) {
 	// Setup chaincode path
 	chaincodeInstallPath := ccprovider.GetChaincodeInstallPathFromViper()
