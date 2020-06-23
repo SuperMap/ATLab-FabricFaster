@@ -526,7 +526,7 @@ func (h *Handler) HandleRegister(msg *pb.ChaincodeMessage) {
 
 	s := chaincodeID.Name
 	chaincodeID.Name += "-" + h.Flag
-	systemCCs := []string{"lscc:latest", "cscc:latest", "qscc:latest"}
+	systemCCs := []string{"lscc:latest", "cscc:latest", "qscc:latest", "lscc:1.4.4", "cscc:1.4.4", "qscc:1.4.4"}
 	for _, v := range systemCCs {
 		if v == s {
 			chaincodeID.Name = s
