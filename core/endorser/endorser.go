@@ -158,7 +158,7 @@ func (e *Endorser) callChaincode(txParams *ccprovider.TransactionParams, version
 	// per doc anything < 400 can be sent as TX.
 	// fabric errors will always be >= 400 (ie, unambiguous errors )
 	// "lscc" will respond with status 200 or 500 (ie, unambiguous OK or ERROR)
-	if responses[0].Status >= shim.ERRORTHRESHOLD {
+	if responses[len(responses)-1].Status >= shim.ERRORTHRESHOLD {
 		return responses, nil, nil
 	}
 
@@ -616,7 +616,7 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProps *pb.SignedPr
 	}
 	if reponses != nil {
 		// 出错时，错误的信息放入响应数组的第一个，其中的多笔交易都失败
-		res := reponses[0]
+		res := reponses[len(reponses)-1]
 		if res.Status >= shim.ERROR {
 			endorserLogger.Errorf("[%s][%s] simulateProposal() resulted in chaincode %s response status %d for txid: %s", chainID, shorttxid(txid), hdrExt.ChaincodeId, res.Status, txid)
 			var cceventBytes []byte
